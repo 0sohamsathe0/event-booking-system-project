@@ -1,0 +1,253 @@
+EVENT BOOKING SYSTEM - UPDATED ENTITY RELATIONSHIP DIAGRAM
+==========================================================
+
+Legend: PK = Primary Key, FK = Foreign Key, UQ = Unique, 1 = One, N = Many
+
+
+TEXT ERD
+--------
+
+USERS
+ PK id
+ UQ email
+ name, phone, password_hash
+ role, account_status
+ FK reviewed_by (nullable)
+ reviewed_at, review_reason
+ created_at, updated_at
+   |
+   | 1:N organizer owns
+   +------------------------> EVENTS
+   |                           PK id
+   |                           FK organizer_id
+   |                           FK hall_id
+   |                           FK category_id
+   |                           title, description, poster_path
+   |                           start_datetime, end_datetime
+   |                           sale_start_datetime, sale_end_datetime
+   |                           event_capacity, status
+   |                           FK cancelled_by, cancelled_at
+   |                           cancellation_reason
+   |                           created_at, updated_at
+   |                              |
+   |                              +-- N:1 --> HALLS
+   |                              +-- N:1 --> EVENT_CATEGORIES
+   |                              +-- 1:N --> TICKET_TYPES
+   |                              +-- 1:N --> BOOKINGS
+   |                              +-- 1:N --> EVENT_STATUS_HISTORY
+   |                              +-- 1:N --> EVENT_CANCELLATION_REQUESTS
+   |                              +-- 1:N --> NOTIFICATIONS (optional link)
+   |
+   | 1:N customer creates
+   +------------------------> BOOKINGS
+   |                           PK id
+   |                           UQ booking_reference
+   |                           FK customer_id
+   |                           FK event_id
+   |                           status
+   |                           total_quantity, total_amount
+   |                           reservation_expires_at (nullable)
+   |                           booked_at
+   |                           confirmed_at (nullable)
+   |                           cancelled_at, cancellation_reason
+   |                           created_at, updated_at
+   |                              |
+   |                              +-- 1:N --> BOOKING_ITEMS
+   |                              +-- 1:N --> PAYMENTS
+   |                              +-- 1:N --> REFUNDS
+   |                              +-- 1:N --> NOTIFICATIONS (optional link)
+   |
+   | 1:N recipient
+   +------------------------> NOTIFICATIONS
+   |
+   | 1:N initiates
+   +------------------------> REFUNDS
+
+
+HALLS
+ PK id
+ name, address, city
+ maximum_capacity
+ contact_phone, contact_email
+ is_active, created_at, updated_at
+   |
+   +-- 1:N --> EVENTS
+
+
+EVENT_CATEGORIES
+ PK id
+ UQ name
+ is_active, created_at, updated_at
+   |
+   +-- 1:N --> EVENTS
+
+
+EVENT_STATUS_HISTORY
+ PK id
+ FK event_id
+ old_status, new_status
+ FK changed_by (nullable)
+ reason, created_at
+
+
+EVENT_CANCELLATION_REQUESTS
+ PK id
+ FK event_id
+ FK requested_by
+ reason, status
+ FK reviewed_by (nullable)
+ reviewed_at, review_note
+ created_at, updated_at
+
+
+TICKET_TYPES
+ PK id
+ FK event_id
+ name, price, capacity
+ reserved_quantity
+ sold_quantity
+ is_active, display_order
+ created_at, updated_at
+ UQ (event_id, name)
+ UQ (id, event_id)
+   |
+   +-- 1:N --> BOOKING_ITEMS
+
+Availability = capacity - reserved_quantity - sold_quantity
+
+
+BOOKING_ITEMS
+ PK id
+ FK booking_id
+ FK event_id
+ FK ticket_type_id
+ quantity
+ unit_price (historical snapshot)
+ created_at
+ UQ (booking_id, ticket_type_id)
+
+Composite integrity:
+- (booking_id, event_id) references BOOKINGS(id, event_id)
+- (ticket_type_id, event_id) references TICKET_TYPES(id, event_id)
+
+
+PAYMENTS
+ PK id
+ FK booking_id
+ provider                         fixed as razorpay in V1
+ UQ provider_order_id             Razorpay order ID
+ UQ provider_payment_id nullable  Razorpay payment ID
+ amount
+ currency                         INR
+ status                           created/authorized/captured/failed/refunded
+ signature_verified_at nullable
+ captured_at nullable
+ failure_code, failure_description nullable
+ created_at, updated_at
+   |
+   +-- N:1 --> BOOKINGS
+   +-- 1:N --> REFUNDS
+
+
+REFUNDS
+ PK id
+ FK booking_id
+ FK payment_id
+ UQ provider_refund_id nullable
+ amount
+ status                           pending/processing/processed/failed
+ reason
+ FK initiated_by nullable
+ failure_description nullable
+ requested_at, processed_at nullable
+ created_at, updated_at
+   |
+   +-- N:1 --> BOOKINGS
+   +-- N:1 --> PAYMENTS
+
+
+PAYMENT_WEBHOOK_EVENTS
+ PK id
+ UQ provider_event_id
+ event_type
+ provider                         razorpay
+ payload_hash
+ processing_status                received/processed/failed/ignored
+ received_at
+ processed_at nullable
+ error_message nullable
+
+This table makes duplicate webhook delivery harmless. Sensitive payment data is
+not copied unnecessarily. Raw payload retention, if used during implementation,
+must be limited and protected.
+
+
+NOTIFICATIONS
+ PK id
+ FK recipient_user_id
+ type, title, message
+ FK event_id nullable
+ FK booking_id nullable
+ read_at nullable
+ created_at
+
+
+CARDINALITY SUMMARY
+-------------------
+- One organizer user owns many events; each event has one organizer.
+- One hall hosts many events; each event uses one hall.
+- One category classifies many events; each event has one category.
+- One event has many ticket types and bookings.
+- One customer has many bookings; each booking belongs to one customer/event.
+- One booking has one or more booking items and may have multiple payment
+  attempts, but at most one successfully captured payment for its full amount.
+- One payment can have multiple refund records within the captured refundable
+  amount.
+- One event has many status records and cancellation requests.
+- One user receives many notifications.
+
+
+STATUS SUMMARY
+--------------
+Event status:
+- pending, approved, rejected, cancelled
+- completed is derived from approved + end_datetime in the past
+
+Booking status:
+- pending_payment
+- confirmed
+- payment_failed
+- expired
+- customer_cancelled
+- event_cancelled
+
+Payment status:
+- created
+- authorized
+- captured
+- failed
+- refunded (full refund; partial refund remains captured with refund records)
+
+Refund status:
+- pending
+- processing
+- processed
+- failed
+
+
+CRITICAL INTEGRITY RULES
+------------------------
+- available = capacity - reserved_quantity - sold_quantity
+- capacity >= reserved_quantity + sold_quantity
+- Payment confirmation moves reserved to sold exactly once.
+- Failure/expiry releases reserved quantity exactly once.
+- Only server-calculated amounts are sent to Razorpay.
+- A Razorpay Order is created before Checkout.
+- Checkout and webhook signatures are verified server-side.
+- Duplicate callbacks/webhooks must be idempotent.
+- External API calls must not occur while long database transactions hold locks.
+- Refund records preserve the result even when a booking is already cancelled.
+- No card number, CVV, UPI PIN, API secret, or other sensitive payment credential
+  is stored in this database.
+- Historical events, bookings, items, payments and refunds are not deleted.
+

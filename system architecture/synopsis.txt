@@ -1,0 +1,107 @@
+EVENT BOOKING SYSTEM - UPDATED SHORT SYNOPSIS
+=============================================
+
+1. PROJECT OVERVIEW
+-------------------
+The Event Booking System manages paid events in one fixed hall. It will use Core
+PHP, MySQL, HTML5, CSS3, Vanilla JavaScript, Apache/XAMPP, and Razorpay Standard
+Checkout. PDO prepared statements will be used for database access. V1 has
+online payment but no individual seat selection.
+
+2. USERS
+--------
+- Customer: browses approved events, pays online, receives confirmed bookings,
+  views booking history, and requests cancellation before an event starts.
+- Organizer: registers for approval, manages owned events and ticket types,
+  requests event cancellation, and views ticket/revenue information.
+- Admin/Hall Manager: approves organizers and events, protects the hall
+  schedule, reviews cancellations/refunds, and monitors reports.
+
+All roles use one users table. Email uniquely identifies one account. Organizer
+accounts progress through pending, approved, rejected, or disabled states.
+
+3. EVENTS, HALL AND TICKETS
+---------------------------
+- One hall record stores hall details and absolute maximum capacity.
+- Approved events may never overlap.
+- Editing an approved event returns it to pending for admin review.
+- Completed is derived when an approved event's end time has passed.
+- Each event can have several ticket types with price and capacity.
+- Event capacity cannot exceed hall capacity, and applicable ticket capacities
+  cannot exceed event capacity.
+- Free tickets remain supported; they skip Razorpay but use the same inventory
+  and booking records.
+- Ticket types and events with history are never physically deleted.
+
+4. INVENTORY MODEL
+------------------
+Each ticket type stores:
+- capacity
+- reserved_quantity (temporary unpaid checkout reservations)
+- sold_quantity (successfully paid/confirmed tickets)
+
+Available quantity is:
+capacity - reserved_quantity - sold_quantity
+
+A reservation normally lasts 10 minutes. Failed, abandoned, or expired payment
+attempts release reserved inventory. Successful captured payment moves the
+quantity from reserved to sold in one database transaction.
+
+5. RAZORPAY BOOKING FLOW
+------------------------
+1. Customer selects up to 10 tickets for one event.
+2. Server locks inventory, validates availability, calculates prices, creates a
+   pending_payment booking, reserves inventory, and sets reservation_expires_at.
+3. Server creates a Razorpay Order using the server-calculated amount in paise.
+4. Customer completes Razorpay Standard Checkout.
+5. Server verifies the returned Razorpay signature and confirms captured payment
+   using trusted server-side information/webhooks.
+6. Booking becomes confirmed, reserved inventory becomes sold inventory, and a
+   confirmation notification is created.
+7. Failed or expired payment leaves no confirmed booking and releases inventory.
+
+Browser-submitted prices, totals, availability, payment status, payment IDs, and
+signatures are never trusted without server verification. Secret keys remain on
+the server and are never sent to the browser.
+
+6. BOOKINGS AND PRICE HISTORY
+-----------------------------
+- A booking belongs to one customer and one event and contains several items.
+- Booking items store quantity and unit-price snapshots.
+- Booking totals are calculated by the backend from current database prices.
+- Every booking has a numeric ID and unique public reference.
+- Payment attempts are stored separately from bookings so gateway and business
+  statuses are not mixed.
+
+7. CANCELLATIONS AND REFUNDS
+----------------------------
+- Customer cancellation before event start changes a confirmed booking to
+  customer_cancelled and restores sold inventory transactionally.
+- Organizer requests cancellation; admin confirms event cancellation. Affected
+  bookings become event_cancelled and their inventory is restored.
+- A captured Razorpay payment requires a refund record. Refund processing is
+  tracked independently as pending, processed, or failed.
+- Database transactions must not remain open during external Razorpay API calls.
+  Local cancellation and refund initiation/confirmation are separate reliable
+  steps with retry-safe identifiers.
+
+8. PLANNED DATABASE TABLES
+--------------------------
+users, halls, event_categories, events, event_status_history, ticket_types,
+bookings, booking_items, payments, refunds, payment_webhook_events,
+event_cancellation_requests, and notifications.
+
+9. SECURITY
+-----------
+The application will use password hashing, secure sessions, CSRF protection,
+prepared PDO statements, output escaping, server validation, role/ownership
+checks, safe image uploads, database transactions, HTTPS in live mode, Razorpay
+server-side order creation, HMAC signature verification, webhook signature
+verification, idempotent webhook/refund handling, and protected API secrets.
+
+10. FUTURE FEATURES (NOT V1)
+----------------------------
+Individual seats, QR/PDF tickets, promo codes, waitlists, SMS/WhatsApp, multiple
+halls/venues, mobile apps, check-in, tax automation, and advanced analytics are
+outside V1.
+

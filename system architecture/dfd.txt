@@ -1,0 +1,188 @@
+EVENT BOOKING SYSTEM - UPDATED DATA FLOW DIAGRAMS
+=================================================
+
+Legend:
+[ENTITY]      External actor/system
+(PROCESS)     System process
+||STORE||     Database data store
+---------->   Data flow
+
+
+DFD LEVEL 0 - CONTEXT DIAGRAM
+-----------------------------
+
+ [CUSTOMER] -- registration, event search, ticket selection, payment -->+
+      ^                                                                  |
+      | booking/payment result, history, cancellation/refund status      v
+      +--------------------------------------------------------+----------------+
+                                                               | EVENT BOOKING  |
+ [ORGANIZER] -- account, event, tickets, cancellation request ->| SYSTEM         |
+      ^                                                        +----------------+
+      | approval, sales and cancellation information                    ^
+      +-----------------------------------------------------------------+
+                                                                        |
+ [ADMIN] -- approvals, cancellation/refund management ----------------->|
+      ^                                                                 |
+      | schedule, bookings, payment reports and notifications           |
+      +-----------------------------------------------------------------+
+                                                                        |
+ [RAZORPAY] <------ order/payment/refund API and signed webhooks --------+
+
+
+DFD LEVEL 1 - MAIN PROCESSES
+----------------------------
+
+[CUSTOMER/ORGANIZER/ADMIN]
+        |
+        v
+(1.0 AUTHENTICATION & ACCOUNT MANAGEMENT) <----> ||USERS||
+        |
+        +---- role, account state and authenticated session
+
+[ORGANIZER] --> (2.0 MANAGE EVENTS & TICKET TYPES)
+                       |----> ||EVENTS||
+                       |----> ||TICKET_TYPES||
+                       |----> ||EVENT_STATUS_HISTORY||
+                       +----> ||NOTIFICATIONS||
+
+[ADMIN] --> (3.0 REVIEW ORGANIZERS & EVENTS)
+                       |<---> ||USERS||
+                       |<---> ||HALLS & EVENT_CATEGORIES||
+                       |<---> ||EVENTS||
+                       |----> ||EVENT_STATUS_HISTORY||
+                       +----> ||NOTIFICATIONS||
+
+[CUSTOMER] --> (4.0 BROWSE APPROVED EVENTS)
+                       |<---- ||EVENTS||
+                       |<---- ||EVENT_CATEGORIES||
+                       |<---- ||TICKET_TYPES||
+                       +----> event details, prices and live availability
+
+[CUSTOMER] --> (5.0 RESERVE INVENTORY & CREATE PAYMENT ORDER)
+                       |<---> ||EVENTS & TICKET_TYPES||
+                       |----> ||BOOKINGS & BOOKING_ITEMS||
+                       |----> ||PAYMENTS||
+                       |----> [RAZORPAY ORDERS API]
+                       +----> checkout order details
+
+[CUSTOMER] --> [RAZORPAY STANDARD CHECKOUT]
+                       |
+                       +----> payment identifiers and signature
+                       v
+(6.0 VERIFY PAYMENT & CONFIRM BOOKING)
+                       |<---- [RAZORPAY / SIGNED WEBHOOKS]
+                       |<---> ||PAYMENTS||
+                       |<---> ||PAYMENT_WEBHOOK_EVENTS||
+                       |<---> ||BOOKINGS||
+                       |<---> ||TICKET_TYPES||
+                       +----> ||NOTIFICATIONS||
+
+(7.0 EXPIRE FAILED/ABANDONED RESERVATIONS)
+                       |<---> ||BOOKINGS||
+                       |<---> ||PAYMENTS||
+                       +----> ||TICKET_TYPES|| (release reserved quantity)
+
+[CUSTOMER] --> (8.0 CANCEL BOOKING & REQUEST REFUND)
+                       |<---> ||BOOKINGS||
+                       |<---> ||TICKET_TYPES||
+                       |----> ||REFUNDS||
+                       |<---> [RAZORPAY REFUND API]
+                       +----> ||NOTIFICATIONS||
+
+[ORGANIZER] --> (9.0 REQUEST EVENT CANCELLATION)
+                       |----> ||EVENT_CANCELLATION_REQUESTS||
+                       +----> ||NOTIFICATIONS||
+
+[ADMIN] --> (10.0 PROCESS EVENT CANCELLATION & REFUNDS)
+                       |<---> ||EVENT_CANCELLATION_REQUESTS||
+                       |<---> ||EVENTS||
+                       |<---> ||BOOKINGS||
+                       |<---> ||TICKET_TYPES||
+                       |----> ||REFUNDS||
+                       |<---> [RAZORPAY REFUND API]
+                       |----> ||EVENT_STATUS_HISTORY||
+                       +----> ||NOTIFICATIONS||
+
+(11.0 DASHBOARDS & NOTIFICATIONS) reads users, events, bookings, ticket types,
+payments, refunds, cancellation requests and notifications, then provides
+role-appropriate status and reports.
+
+
+DFD LEVEL 2 - PAID BOOKING FLOW
+-------------------------------
+
+[CUSTOMER SELECTS TICKETS]
+        |
+        v
+(VALIDATE EVENT, SALES WINDOW AND TOTAL QUANTITY <= 10)
+        |
+        v
+(BEGIN DATABASE TRANSACTION)
+        |
+        v
+(LOCK EVENT, THEN TICKET TYPES IN ASCENDING ID ORDER)
+        |
+        v
+(RECHECK AVAILABLE = CAPACITY - RESERVED - SOLD)
+        |
+        +-- unavailable --> ROLLBACK --> "Tickets no longer available"
+        |
+        v
+(CALCULATE PRICES ON SERVER)
+        |
+        v
+(CREATE PENDING_PAYMENT BOOKING + ITEMS)
+        |
+        v
+(INCREASE RESERVED_QUANTITY; SET 10-MINUTE EXPIRY; COMMIT)
+        |
+        v
+(CREATE RAZORPAY ORDER ON SERVER AND OPEN CHECKOUT)
+        |
+        +-- failed/abandoned/expired --> release reservation transactionally
+        |
+        v
+(VERIFY CHECKOUT SIGNATURE AND CAPTURED PAYMENT SERVER-SIDE)
+        |
+        v
+(TRANSACTION: LOCK EVENT, BOOKING AND TICKET TYPES)
+        |
+        v
+(MOVE RESERVED_QUANTITY TO SOLD_QUANTITY)
+        |
+        v
+(MARK PAYMENT CAPTURED + BOOKING CONFIRMED + COMMIT)
+        |
+        v
+[BOOKING CONFIRMATION]
+
+Webhook processing is idempotent. Duplicate webhook delivery must not confirm a
+booking or move inventory more than once.
+
+
+DFD LEVEL 2 - CANCELLATION AND REFUND
+--------------------------------------
+
+[VALID CANCELLATION]
+        |
+        v
+(TRANSACTION: LOCK EVENT, BOOKING AND TICKET TYPES)
+        |
+        v
+(CHANGE BOOKING TO CUSTOMER_CANCELLED OR EVENT_CANCELLED)
+        |
+        v
+(DECREASE SOLD_QUANTITY; CREATE PENDING REFUND RECORD; COMMIT)
+        |
+        v
+(CALL RAZORPAY REFUND API WITHOUT HOLDING DATABASE LOCKS)
+        |
+        +-- accepted --> store Razorpay refund ID and track processing
+        +-- failed ----> store failure and permit safe retry
+        |
+        v
+(SIGNED REFUND WEBHOOK / API VERIFICATION)
+        |
+        v
+(UPDATE REFUND STATUS AND NOTIFY CUSTOMER)
+

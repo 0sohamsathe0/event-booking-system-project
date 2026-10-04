@@ -1,0 +1,68 @@
+EVENT BOOKING SYSTEM - DATABASE TABLE GUIDE
+===========================================
+
+This system uses 13 main database tables. Each table has one clear purpose.
+
+1. users
+Stores customer, organizer, and admin accounts, including login details, role,
+account status, and organizer approval information.
+
+2. halls
+Stores the fixed hall's name, address, contact details, and maximum capacity.
+
+3. event_categories
+Stores admin-managed categories such as Music, Comedy, Theatre, and Workshop.
+
+4. events
+Stores event information, organizer, category, hall, schedule, sale period,
+capacity, approval status, poster path, and cancellation details.
+
+5. event_status_history
+Keeps a short history of event approvals, rejections, resubmissions, and
+cancellations, including who performed each action and why.
+
+6. ticket_types
+Stores an event's ticket options, such as Standard, Premium, and VIP, along with
+their price, capacity, reserved quantity, sold quantity, and active status.
+
+7. bookings
+Stores the main customer booking record, public booking reference, event,
+booking status, total quantity, total amount, and reservation expiry time.
+
+8. booking_items
+Stores the individual ticket types inside a booking. It preserves the quantity
+and price paid so old bookings remain correct after ticket prices change.
+
+9. payments
+Stores Razorpay order and payment references, amount, currency, payment status,
+signature verification time, and payment success or failure details.
+
+10. refunds
+Stores refund requests and their Razorpay status, amount, reason, responsible
+user, processing time, and any failure information.
+
+11. payment_webhook_events
+Records Razorpay webhook events so repeated notifications are handled safely and
+the same payment or refund is not processed more than once.
+
+12. event_cancellation_requests
+Stores an organizer's request to cancel an approved event and the admin's final
+approval or rejection decision.
+
+13. notifications
+Stores dashboard notifications for customers, organizers, and admins, including
+booking confirmations, approval results, cancellations, and refund updates.
+
+IMPORTANT SUMMARY
+-----------------
+- users manages people and access.
+- halls, event_categories, events, and ticket_types manage events and capacity.
+- bookings and booking_items manage customer ticket orders and price history.
+- payments, refunds, and payment_webhook_events manage Razorpay activity.
+- event_status_history and event_cancellation_requests preserve accountability.
+- notifications keeps every user informed through their dashboard.
+
+No sensitive card number, CVV, UPI PIN, or Razorpay secret key is stored in these
+tables. Events, bookings, payments, and other important history are preserved
+instead of being physically deleted.
+

@@ -1,0 +1,66 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Controllers\HomeController;
+use App\Controllers\AuthController;
+use App\Controllers\AccountController;
+use App\Controllers\AdminDashboardController;
+use App\Controllers\AdminOrganizerController;
+use App\Controllers\OrganizerAccountController;
+use App\Controllers\OrganizerEventController;
+use App\Controllers\AdminHallController;
+use App\Controllers\AdminEventController;
+use App\Controllers\OrganizerTicketController;
+use App\Controllers\EventController;
+use App\Controllers\BookingController;
+use App\Controllers\PaymentWebhookController;
+use App\Controllers\NotificationController;
+use App\Controllers\CustomerProfileController;
+use App\Core\Router;
+
+/** @var Router $router */
+$router->get('/', [HomeController::class, 'index']);
+$router->get('/events', [EventController::class, 'index']);
+$router->get('/events/{id}', [EventController::class, 'show']);
+$router->get('/login', [AuthController::class, 'showLogin']);
+$router->post('/login', [AuthController::class, 'login']);
+$router->get('/register', [AuthController::class, 'showCustomerRegistration']);
+$router->post('/register', [AuthController::class, 'registerCustomer']);
+$router->get('/organizer/register', [AuthController::class, 'showOrganizerRegistration']);
+$router->post('/organizer/register', [AuthController::class, 'registerOrganizer']);
+$router->get('/account', [AccountController::class, 'index']);
+$router->get('/profile', [CustomerProfileController::class, 'show']);
+$router->post('/profile', [CustomerProfileController::class, 'update']);
+$router->post('/logout', [AuthController::class, 'logout']);
+$router->post('/organizer/resubmit', [OrganizerAccountController::class, 'resubmit']);
+$router->get('/admin/dashboard', [AdminDashboardController::class, 'index']);
+$router->get('/admin/organizers', [AdminOrganizerController::class, 'index']);
+$router->post('/admin/organizers/{id}/approve', [AdminOrganizerController::class, 'approve']);
+$router->post('/admin/organizers/{id}/reject', [AdminOrganizerController::class, 'reject']);
+$router->get('/organizer/events', [OrganizerEventController::class, 'index']);
+$router->get('/organizer/events/create', [OrganizerEventController::class, 'create']);
+$router->post('/organizer/events', [OrganizerEventController::class, 'store']);
+$router->get('/organizer/events/{id}/edit', [OrganizerEventController::class, 'edit']);
+$router->post('/organizer/events/{id}', [OrganizerEventController::class, 'update']);
+$router->get('/admin/hall', [AdminHallController::class, 'edit']);
+$router->post('/admin/hall', [AdminHallController::class, 'update']);
+$router->get('/admin/events', [AdminEventController::class, 'index']);
+$router->get('/admin/events/{id}', [AdminEventController::class, 'show']);
+$router->post('/admin/events/{id}/approve', [AdminEventController::class, 'approve']);
+$router->post('/admin/events/{id}/reject', [AdminEventController::class, 'reject']);
+$router->get('/organizer/events/{eventId}/tickets', [OrganizerTicketController::class, 'index']);
+$router->post('/organizer/events/{eventId}/tickets', [OrganizerTicketController::class, 'store']);
+$router->post('/organizer/events/{eventId}/tickets/{ticketId}', [OrganizerTicketController::class, 'update']);
+$router->post('/organizer/events/{eventId}/tickets/{ticketId}/activate', [OrganizerTicketController::class, 'activate']);
+$router->post('/organizer/events/{eventId}/tickets/{ticketId}/deactivate', [OrganizerTicketController::class, 'deactivate']);
+$router->post('/events/{eventId}/book', [BookingController::class, 'store']);
+$router->get('/bookings', [BookingController::class, 'index']);
+$router->get('/bookings/{id}', [BookingController::class, 'show']);
+$router->get('/bookings/{id}/checkout', [BookingController::class, 'checkout']);
+$router->post('/bookings/{id}/confirm', [BookingController::class, 'confirm']);
+$router->post('/bookings/{id}/payment-failed', [BookingController::class, 'paymentFailed']);
+$router->get('/notifications', [NotificationController::class, 'index']);
+$router->post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
+$router->post('/notifications/read-all', [NotificationController::class, 'markAllRead']);
+$router->post('/webhooks/razorpay', [PaymentWebhookController::class, 'razorpay']);
