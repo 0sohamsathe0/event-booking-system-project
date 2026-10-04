@@ -12,6 +12,18 @@ HTML, CSS, Vanilla JavaScript, and Razorpay.
    `config/database.php` to `config/database.local.php` and edit the local copy.
 5. Serve the project through Apache and open the project's `/public/` directory.
 
+For PHP's built-in server, run:
+
+```powershell
+C:\xampp\php\php.exe -S 127.0.0.1:8000 -t public public\index.php
+```
+
+Existing Phase 13 databases must receive the additive Phase 14 upgrade once:
+
+```powershell
+C:\xampp\php\php.exe scripts\apply_phase_14_upgrade.php
+```
+
 For the safest Apache setup, configure a virtual host whose document root is the
 `public` directory. The root `index.php` redirects basic folder-based access to
 that directory.
@@ -69,7 +81,14 @@ that directory.
 
 ## Current phase
 
-**Phase 13 - Organizer and Admin Booking Management is complete.** It adds
+**Phase 14 - Production/Vercel Compatibility is implemented locally.** The
+repository now supports local file sessions/posters and production database
+sessions/Cloudinary through configuration. Vercel uses the pinned community
+`vercel-php@0.9.0` runtime because Vercel does not provide an official native
+PHP runtime. External MySQL, Cloudinary, and Razorpay Test Mode credentials are
+still required before an actual Preview deployment can be verified.
+
+Phase 13 added
 read-only operational visibility without changing the booking or Razorpay
 mutation paths. Organizers see customer name/email and bookings only for events
 they own; admins see platform-wide bookings plus customer phone details. Revenue
@@ -91,11 +110,16 @@ isolation. Milestone 12.5 added a customer-only profile page with validated name
 and phone updates, read-only email, CSRF-protected Post/Redirect/Get handling,
 active attendee navigation, and customer/role isolation coverage.
 
+## Deployment
+
+Follow [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the external database,
+Cloudinary, Vercel, environment-variable, Razorpay webhook, Preview validation,
+and rollback procedures. No production deployment is performed automatically.
+
 ## Next milestone
 
-**Vercel compatibility foundation:** add the community PHP entry point, external
-database environment configuration, database-backed sessions, production-safe
-cookies/debug settings, root-domain routing, and the seeded-poster deployment
-policy defined in `TWO_DAY_SUBMISSION_PLAN.md`.
+Create the external MySQL database, configure Vercel Preview environment
+variables, deploy the repository, and execute the documented 25-step Preview
+verification matrix before promoting anything to Production.
 
 This progress section will be updated after every completed phase.

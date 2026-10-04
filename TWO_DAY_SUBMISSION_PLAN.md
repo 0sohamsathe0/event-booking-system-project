@@ -47,8 +47,8 @@ scratch storage. Therefore:
 - PHP sessions must be stored in MySQL for the deployed version.
 - Organizer-uploaded posters cannot be stored permanently on the Vercel
   filesystem.
-- The submission build will use seeded/static posters and a restrained
-  placeholder. Hosted poster replacement may be disabled with a clear message.
+- Production poster uploads use signed server-side Cloudinary REST requests;
+  the existing placeholder remains available when no poster is present.
 - MySQL must be hosted by an external provider and accessed through environment
   variables.
 
@@ -64,6 +64,7 @@ Prepare these before the deployment block begins:
 - Razorpay Test Mode Key Secret
 - A Razorpay webhook secret
 - Access to the Razorpay Test Mode dashboard
+- A Cloudinary account, cloud name, API key, and API secret
 
 Never paste real secrets into source files, Markdown documents, screenshots, or
 chat messages. Store deployment secrets only as Vercel environment variables.
@@ -150,18 +151,18 @@ safe name/phone editing.
 
 ### Block 4 — Vercel compatibility foundation (2.5 hours)
 
-- [ ] Add the Vercel PHP function entry point.
-- [ ] Add `vercel.json` runtime, rewrite, and static-asset configuration.
-- [ ] Make database configuration read Vercel environment variables.
-- [ ] Add a MySQL-backed PHP session handler.
-- [ ] Add the session table to the fresh schema.
-- [ ] Preserve local filesystem sessions for XAMPP development.
-- [ ] Detect the Vercel environment explicitly rather than guessing from the
+- [x] Add the Vercel PHP function entry point.
+- [x] Add `vercel.json` runtime, rewrite, and static-asset configuration.
+- [x] Make database configuration read Vercel environment variables.
+- [x] Add a MySQL-backed PHP session handler.
+- [x] Add the session table to the fresh schema.
+- [x] Preserve local filesystem sessions for XAMPP development.
+- [x] Detect the production environment explicitly rather than guessing from the
       request URL.
-- [ ] Ensure application URLs work at the Vercel domain root.
-- [ ] Ensure debug output is disabled in the deployed environment.
-- [ ] Make secure session cookies environment-aware.
-- [ ] Apply the static/seeded poster policy for Vercel.
+- [x] Ensure application URLs work at the Vercel domain root.
+- [x] Ensure debug output defaults off in the deployed environment.
+- [x] Make secure session cookies environment-aware.
+- [x] Add signed Cloudinary poster storage with safe replacement/deletion.
 
 Exit condition: local behavior remains intact and the repository has a credible
 Vercel build configuration.
@@ -171,8 +172,8 @@ Vercel build configuration.
 - [x] Run PHP lint across the entire project (79 files passed after booking fix).
 - [x] Run database regression tests (booking service, booking history,
       notifications, and customer profile passed locally).
-- [ ] Review all changed routes and form actions.
-- [ ] Update `PROJECT_CONTEXT.md` with completed work and remaining risks.
+- [x] Review all changed routes and form actions.
+- [x] Update `PROJECT_CONTEXT.md` with completed work and remaining risks.
 - [ ] Write a compact handoff containing only changed files, test commands,
       current blocker, and the exact next action.
 

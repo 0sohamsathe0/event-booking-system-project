@@ -20,9 +20,11 @@ use App\Controllers\CustomerProfileController;
 use App\Controllers\OrganizerBookingController;
 use App\Controllers\AdminBookingController;
 use App\Controllers\AdminCustomerController;
+use App\Controllers\HealthController;
 use App\Core\Router;
 
 /** @var Router $router */
+$router->get('/health', [HealthController::class, 'show']);
 $router->get('/', [HomeController::class, 'index']);
 $router->get('/events', [EventController::class, 'index']);
 $router->get('/events/{id}', [EventController::class, 'show']);

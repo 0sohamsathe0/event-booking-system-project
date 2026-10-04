@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Core\Csrf;
+use App\Core\Config;
 
 function e(mixed $value): string
 {
@@ -11,6 +12,11 @@ function e(mixed $value): string
 
 function base_url(): string
 {
+    $configured = Config::get('app.base_path');
+    if (is_string($configured)) {
+        return $configured === '' ? '' : '/' . trim($configured, '/');
+    }
+
     $directory = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
 
     return $directory === '/' ? '' : rtrim($directory, '/');
@@ -18,7 +24,38 @@ function base_url(): string
 
 function url(string $path = ''): string
 {
+    if (preg_match('#^https?://#i', $path)) {
+        return $path;
+    }
+
     return base_url() . '/' . ltrim($path, '/');
+}
+
+function absolute_url(string $path = ''): string
+{
+    if (preg_match('#^https?://#i', $path)) {
+        return $path;
+    }
+
+    $appUrl = rtrim((string) Config::get('app.url', ''), '/');
+
+    return $appUrl !== '' ? $appUrl . url($path) : url($path);
+}
+
+function poster_url(mixed $path): ?string
+{
+    $path = trim((string) $path);
+    if ($path === '') {
+        return null;
+    }
+    if (preg_match('#^https://#i', $path)) {
+        return $path;
+    }
+    if (Config::get('app.environment') === 'production' && str_starts_with($path, 'uploads/events/')) {
+        return null;
+    }
+
+    return url($path);
 }
 
 function csrf_field(): string

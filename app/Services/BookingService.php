@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Core\Database;
+use App\Core\Config;
+use App\Core\Logger;
 use App\Repositories\NotificationRepository;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -113,22 +115,20 @@ final class BookingService
                 );
                 $statement->execute(['order_id' => $order['id'], 'id' => $paymentId]);
             } catch (Throwable $exception) {
-                error_log(sprintf(
-                    '[booking.payment_order_failed] booking_id=%d customer_id=%d error=%s',
-                    $bookingId,
-                    $customerId,
-                    $exception->getMessage()
-                ));
+                Logger::error('booking.payment_order_failed', [
+                    'booking_id' => $bookingId,
+                    'customer_id' => $customerId,
+                    'exception' => $exception,
+                ]);
 
                 try {
                     $this->failAndRelease($bookingId, $customerId, 'Payment order could not be created.');
                 } catch (Throwable $releaseException) {
-                    error_log(sprintf(
-                        '[booking.reservation_release_failed] booking_id=%d customer_id=%d error=%s',
-                        $bookingId,
-                        $customerId,
-                        $releaseException->getMessage()
-                    ));
+                    Logger::error('booking.reservation_release_failed', [
+                        'booking_id' => $bookingId,
+                        'customer_id' => $customerId,
+                        'exception' => $releaseException,
+                    ]);
                     throw $releaseException;
                 }
 
@@ -410,9 +410,7 @@ final class BookingService
 
     private function reservationMinutes(): int
     {
-        $file = is_file(BASE_PATH . '/config/payment.local.php')
-            ? BASE_PATH . '/config/payment.local.php' : BASE_PATH . '/config/payment.php';
-        return max(5, min(30, (int) ((require $file)['reservation_minutes'] ?? 15)));
+        return max(5, min(30, (int) Config::get('payment.reservation_minutes', 15)));
     }
 
     private function utcNow(): string

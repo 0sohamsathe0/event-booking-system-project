@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Core\Logger;
 use App\Services\PaymentWebhookService;
 use DomainException;
 use JsonException;
@@ -26,11 +27,11 @@ final class PaymentWebhookController
             http_response_code(400);
             echo json_encode(['status' => 'rejected']);
         } catch (RuntimeException $exception) {
-            error_log($exception->__toString());
+            Logger::error('razorpay.webhook_unavailable', ['exception' => $exception]);
             http_response_code(503);
             echo json_encode(['status' => 'unavailable']);
         } catch (Throwable $exception) {
-            error_log($exception->__toString());
+            Logger::error('razorpay.webhook_failed', ['exception' => $exception]);
             http_response_code(500);
             echo json_encode(['status' => 'failed']);
         }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Core\Config;
 use RuntimeException;
 
 class RazorpayService
@@ -12,10 +13,7 @@ class RazorpayService
 
     public function __construct()
     {
-        $file = is_file(BASE_PATH . '/config/payment.local.php')
-            ? BASE_PATH . '/config/payment.local.php'
-            : BASE_PATH . '/config/payment.php';
-        $this->config = (require $file)['razorpay'];
+        $this->config = (array) Config::get('payment.razorpay', []);
     }
 
     public function isConfigured(): bool

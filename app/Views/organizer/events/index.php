@@ -14,7 +14,7 @@
             <?php foreach ($events as $event): ?>
                 <article class="management-card">
                     <div class="poster-thumb">
-                        <?php if ($event['poster_path']): ?><img src="<?= e(url($event['poster_path'])) ?>" alt="<?= e($event['title']) ?> poster"><?php else: ?><span>No poster</span><?php endif; ?>
+                        <?php $posterUrl = poster_url($event['poster_path']); if ($posterUrl): ?><img src="<?= e($posterUrl) ?>" alt="<?= e($event['title']) ?> poster"><?php else: ?><span>No poster</span><?php endif; ?>
                     </div>
                     <div class="management-card-body">
                         <div class="card-meta"><span><?= e($event['category_name']) ?></span><span class="status-badge status-<?= e($event['status']) ?>"><?= e(ucfirst($event['status'])) ?></span></div>

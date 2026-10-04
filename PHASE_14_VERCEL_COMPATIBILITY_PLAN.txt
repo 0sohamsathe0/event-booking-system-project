@@ -1,0 +1,37 @@
+PHASE 14 - PRODUCTION / VERCEL COMPATIBILITY
+
+Goal
+Keep the tested XAMPP application working while adding an environment-driven
+production path using external MySQL/MariaDB, database sessions, Cloudinary,
+Razorpay Test Mode, secure logging/cookies, and a public Vercel URL.
+
+Implementation sequence
+1. Freeze the clean Phase 13 baseline and run tests, lint, and secret checks.
+2. Add production environment configuration while retaining ignored local PHP
+   overrides.
+3. Extend PDO for external vendor-neutral MySQL credentials and optional TLS.
+4. Add the additive sessions table and selectable database session handler.
+5. Add local/Cloudinary poster storage drivers with signed REST operations and
+   safe database-failure compensation.
+6. Add the thin Vercel entrypoint, pinned PHP community runtime, root routing,
+   and static-asset rules without replacing public/index.php.
+7. Add safe production errors, structured stderr logging, secure headers, and
+   no-cache behavior for dynamic routes.
+8. Add the safe GET /health endpoint.
+9. Preserve and regression-test all Razorpay Test Mode verification paths.
+10. Run focused and existing tests, full PHP lint, local HTTP checks, and a
+    tracked-file secret scan.
+11. Update project context, submission status, and exact deployment guidance.
+12. Deploy only to Vercel Preview when external credentials are available; run
+    the complete 25-item checklist before Production promotion.
+
+Selected deployment method
+Vercel does not provide an official native PHP runtime for this application.
+The smallest repository-compatible adapter is the maintained community PHP
+runtime. vercel.json pins vercel-php@0.9.0 (PHP 8.5), and api/index.php delegates
+to the existing public front controller, bootstrap, router, and application.
+
+Rollback
+SESSION_DRIVER=file, POSTER_STORAGE_DRIVER=local, and LOG_CHANNEL=file preserve
+the local XAMPP path. Phase 14 SQL is additive, so rollback does not require
+dropping tables or columns.

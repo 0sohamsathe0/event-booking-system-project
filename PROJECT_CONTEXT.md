@@ -14,8 +14,9 @@ selection.
 - Core PHP 8 with strict types and a small custom MVC-style structure
 - MySQL/MariaDB through PDO with native prepared statements
 - HTML5, shared server-rendered PHP layouts, CSS3, and vanilla JavaScript
-- Apache/XAMPP; `public/` is the intended document root
+- Apache/XAMPP locally; Vercel community PHP runtime for public deployment
 - Razorpay Orders API, Standard Checkout, payment lookup, and signed webhooks
+- Cloudinary signed REST API for production poster storage
 - No Composer, frontend framework, build process, or third-party PHP package
 
 ## Folder structure
@@ -28,8 +29,9 @@ selection.
 - `app/Views/` - public, authentication, booking, organizer, and admin templates
 - `app/Support/helpers.php` - escaping, URLs, CSRF fields, dates, and money
 - `bootstrap/app.php` - autoloading and application bootstrap
-- `config/` - application, database, and Razorpay configuration
-- `database/event_booking_system.sql` - complete 13-table schema and categories
+- `config/` - application, database, payment, and poster-storage configuration
+- `database/event_booking_system.sql` - complete 14-table schema and categories
+- `database/phase_14_upgrade.sql` - additive Phase 13 to Phase 14 upgrade
 - `public/` - front controller, `.htaccess`, CSS, JavaScript, and event posters
 - `routes/web.php` - all registered GET and POST routes
 - `storage/` - ignored local sessions and logs
@@ -79,7 +81,9 @@ selection.
 
 ## Database architecture
 
-The schema defines 13 InnoDB tables:
+The schema defines 14 InnoDB tables. Phase 14 adds `sessions` for production
+PHP session persistence and adds nullable poster-provider/public-ID metadata to
+`events`; all earlier booking and payment structures remain unchanged.
 
 1. `users` - all roles, passwords, account status, and organizer review data
 2. `halls` - venue identity, contact details, and maximum capacity
@@ -94,6 +98,7 @@ The schema defines 13 InnoDB tables:
 11. `payment_webhook_events` - webhook idempotency and retained payloads
 12. `event_cancellation_requests` - planned organizer/admin cancellation flow
 13. `notifications` - per-user messages and optional event/booking links
+14. `sessions` - production PHP session payload and expiry metadata
 
 Key relationships and constraints:
 
@@ -134,6 +139,28 @@ Key relationships and constraints:
 - Admin-wide booking/customer reporting, customer and organizer profile
   summaries, payment-status visibility, and commercial dashboard metrics
 - Dark responsive visual system with role accents and accessible focus states
+- Environment-driven production configuration with fail-closed validation
+- File or database PHP sessions selected through `SESSION_DRIVER`
+- Local or signed Cloudinary poster storage selected through
+  `POSTER_STORAGE_DRIVER`
+- External MySQL TLS options, sanitized stderr logs, production security headers,
+  safe `/health`, and Vercel root-domain routing
+
+## Phase 14 production architecture
+
+- Local defaults remain XAMPP MySQL, file sessions, local poster files, file
+  logs, and ignored PHP configuration overrides.
+- Production requires external MySQL/MariaDB, database sessions, Cloudinary,
+  stderr logs, HTTPS, and Razorpay Test Mode environment secrets.
+- `api/index.php` forwards Vercel Functions to the existing bootstrap and router;
+  `public/index.php` remains the local front controller.
+- `vercel.json` pins `vercel-php@0.9.0` (PHP 8.5), routes `/assets/*` to public
+  static files, and sends all dynamic requests to the application.
+- Production uploads never rely on Vercel's filesystem. Cloudinary URLs and
+  managed public IDs are stored additively; existing `poster_path` values stay
+  compatible.
+- Phase 14 is locally verified but has not been deployed to Vercel. External
+  credentials and the Preview checklist are still required.
 
 ## Current booking workflow
 
@@ -375,8 +402,8 @@ Admin:
 - No broad HTTP automation suite exists; focused database-backed coverage now
   includes booking service/inventory, management ownership/privacy, notification,
   booking-history, and profile behavior.
-- The supplied directory has no `.git` metadata, so commits/branches are unknown.
-- All 94 PHP files, JavaScript syntax, and the booking-service, management-reporting, booking-history,
+- Git contains a clean Phase 13 baseline commit before the Phase 14 work.
+- All Phase 14 PHP files, JavaScript syntax, and the booking-service, management-reporting, booking-history,
   notification, and profile database tests currently pass. A live HTTP
   reproduction also confirms failed Razorpay order creation leaves no active
   hold. Real Razorpay Test Mode checkout and full multi-viewport QA remain
@@ -399,19 +426,15 @@ Admin:
 
 ## Last completed development milestone
 
-**Phase 13 - Organizer and Admin Booking Management** is the latest completed
-milestone. It added ownership-scoped organizer booking visibility, admin-wide
-booking/customer reporting, organizer and customer detail summaries, confirmed
-revenue and ticket metrics, search/filter/pagination controls, responsive role
-navigation, and database-backed ownership/privacy tests. Organizer views expose
-customer name/email only; customer phone remains admin-only. Booking, inventory,
-and Razorpay mutation behavior was preserved.
+**Phase 14 - Production/Vercel Compatibility** is implemented and locally
+verified. It adds production configuration, external MySQL/TLS support,
+database sessions, Cloudinary poster storage, safe logging/security behavior,
+health checks, Vercel routing, additive schema upgrades, and focused regression
+coverage without changing booking, inventory, authorization, or Razorpay
+verification rules.
 
 ## Recommended next task
 
-Start the **Vercel compatibility foundation** from the two-day submission plan:
-add the community PHP function entry point and routing, environment-driven
-external MySQL configuration, database-backed sessions with a schema table,
-production-safe debug and cookie behavior, root-domain URLs, and the seeded or
-placeholder poster policy. Preserve local XAMPP behavior while making these
-changes.
+Provision external MySQL and Cloudinary, configure Vercel Preview environment
+variables, deploy the pinned community runtime, configure the Razorpay Test Mode
+webhook, and complete every item in `docs/DEPLOYMENT.md` before promotion.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Core\Database;
+use App\Core\Config;
 use App\Repositories\NotificationRepository;
 use DomainException;
 use PDOException;
@@ -17,9 +18,7 @@ final class PaymentWebhookService
 
     public function __construct()
     {
-        $file = is_file(BASE_PATH . '/config/payment.local.php')
-            ? BASE_PATH . '/config/payment.local.php' : BASE_PATH . '/config/payment.php';
-        $this->config = (require $file)['razorpay'];
+        $this->config = (array) Config::get('payment.razorpay', []);
     }
 
     public function process(string $rawBody, string $signature, string $providerEventId): string

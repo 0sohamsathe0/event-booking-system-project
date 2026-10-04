@@ -84,6 +84,8 @@ CREATE TABLE IF NOT EXISTS `events` (
     `title` VARCHAR(180) NOT NULL,
     `description` TEXT NOT NULL,
     `poster_path` VARCHAR(255) NULL,
+    `poster_provider` VARCHAR(20) NULL,
+    `poster_public_id` VARCHAR(255) NULL,
     `start_datetime` DATETIME(6) NOT NULL,
     `end_datetime` DATETIME(6) NOT NULL,
     `sale_start_datetime` DATETIME(6) NOT NULL,
@@ -128,6 +130,15 @@ CREATE TABLE IF NOT EXISTS `events` (
         CHECK (`sale_end_datetime` <= `start_datetime`),
     CONSTRAINT `chk_events_capacity_positive`
         CHECK (`event_capacity` > 0)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `sessions` (
+    `id` VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    `payload` MEDIUMBLOB NOT NULL,
+    `last_activity` DATETIME(6) NOT NULL,
+    `expires_at` DATETIME(6) NOT NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_sessions_expiry` (`expires_at`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `event_status_history` (
@@ -432,4 +443,3 @@ INSERT IGNORE INTO `event_categories` (`name`) VALUES
 
 -- Create the first admin later with a password hash produced by PHP password_hash().
 -- Never place or store a plaintext admin password in this SQL file.
-

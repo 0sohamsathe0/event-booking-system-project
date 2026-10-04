@@ -11,5 +11,6 @@ return [
     'username' => 'root',
     'password' => '',
     'charset' => 'utf8mb4',
+    'ssl_mode' => 'disabled',
+    'ssl_ca' => '',
 ];
-

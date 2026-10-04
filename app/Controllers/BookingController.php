@@ -8,6 +8,7 @@ use App\Core\Auth;
 use App\Core\Authorization;
 use App\Core\Csrf;
 use App\Core\Session;
+use App\Core\Logger;
 use App\Core\View;
 use App\Repositories\BookingRepository;
 use App\Repositories\NotificationRepository;
@@ -153,7 +154,10 @@ final class BookingController
         if ($exception instanceof DomainException) {
             Session::flash('error', $exception->getMessage());
         } else {
-            error_log($exception->__toString());
+            Logger::error('booking.request_failed', [
+                'exception' => $exception,
+                'customer_id' => Auth::id(),
+            ]);
             Session::flash('error', $fallback);
         }
     }

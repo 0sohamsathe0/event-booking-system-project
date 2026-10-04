@@ -21,9 +21,12 @@ final class Router
     public function dispatch(string $method, string $uri): void
     {
         $path = rawurldecode(parse_url($uri, PHP_URL_PATH) ?: '/');
-        $basePath = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
+        $configuredBasePath = Config::get('app.base_path');
+        $basePath = is_string($configuredBasePath)
+            ? ($configuredBasePath === '' ? '' : '/' . trim($configuredBasePath, '/'))
+            : str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
 
-        if ($basePath !== '/' && $basePath !== '.' && str_starts_with($path, $basePath)) {
+        if ($basePath !== '' && $basePath !== '/' && $basePath !== '.' && str_starts_with($path, $basePath)) {
             $path = substr($path, strlen($basePath)) ?: '/';
         }
 

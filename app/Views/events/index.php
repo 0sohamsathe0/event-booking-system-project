@@ -67,7 +67,7 @@
         <?php foreach ($events as $event): ?>
             <article class="public-event-card">
                 <a class="event-image" href="<?= e(url('events/' . $event['id'])) ?>">
-                    <?php if ($event['poster_path']): ?><img src="<?= e(url($event['poster_path'])) ?>" alt="<?= e($event['title']) ?> poster"><?php else: ?><span>No poster</span><?php endif; ?>
+                    <?php $posterUrl = poster_url($event['poster_path']); if ($posterUrl): ?><img src="<?= e($posterUrl) ?>" alt="<?= e($event['title']) ?> poster"><?php else: ?><span>No poster</span><?php endif; ?>
                 </a>
                 <div class="public-event-copy">
                     <span class="event-meta"><?= e(local_datetime($event['start_datetime'], 'd M Y')) ?> / <?= e($event['category_name']) ?></span>

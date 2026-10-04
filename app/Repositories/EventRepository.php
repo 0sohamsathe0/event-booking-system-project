@@ -50,10 +50,12 @@ final class EventRepository
         $statement = Database::connection()->prepare(
             "INSERT INTO events
                 (organizer_id, hall_id, category_id, title, description, poster_path,
+                 poster_provider, poster_public_id,
                  start_datetime, end_datetime, sale_start_datetime,
                  sale_end_datetime, event_capacity, status)
              VALUES
                 (:organizer_id, :hall_id, :category_id, :title, :description, :poster_path,
+                 :poster_provider, :poster_public_id,
                  :start_datetime, :end_datetime, :sale_start_datetime,
                  :sale_end_datetime, :event_capacity, 'pending')"
         );
@@ -70,6 +72,7 @@ final class EventRepository
             'UPDATE events SET
                 hall_id = :hall_id, category_id = :category_id, title = :title,
                 description = :description, poster_path = :poster_path,
+                poster_provider = :poster_provider, poster_public_id = :poster_public_id,
                 start_datetime = :start_datetime, end_datetime = :end_datetime,
                 sale_start_datetime = :sale_start_datetime,
                 sale_end_datetime = :sale_end_datetime,

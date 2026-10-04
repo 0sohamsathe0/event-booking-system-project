@@ -10,7 +10,7 @@
     </div>
     <div class="review-layout">
         <article class="panel">
-            <?php if ($event['poster_path']): ?><img class="review-poster" src="<?= e(url($event['poster_path'])) ?>" alt="<?= e($event['title']) ?> poster"><?php endif; ?>
+            <?php $posterUrl = poster_url($event['poster_path']); if ($posterUrl): ?><img class="review-poster" src="<?= e($posterUrl) ?>" alt="<?= e($event['title']) ?> poster"><?php endif; ?>
             <div class="card-meta"><span><?= e($event['category_name']) ?></span><span class="status-badge status-<?= e($event['status']) ?>"><?= e(ucfirst($event['status'])) ?></span></div>
             <p><?= nl2br(e($event['description'])) ?></p>
             <dl class="details-list">

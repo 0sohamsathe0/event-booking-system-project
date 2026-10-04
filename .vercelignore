@@ -1,0 +1,11 @@
+/.git/
+/.vercel/
+/.env
+/.env.*
+/config/database.local.php
+/config/payment.local.php
+/storage/logs/*
+/storage/sessions/*
+/public/uploads/events/*
+/tests/
+/system architecture/
