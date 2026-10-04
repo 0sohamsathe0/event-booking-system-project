@@ -79,12 +79,23 @@ if ($isDashboard) {
                 <nav class="sidebar-nav" aria-label="Dashboard navigation">
                     <?php if ($role === 'admin'): ?>
                         <a class="<?= str_contains($requestPath, '/admin/dashboard') ? 'active' : '' ?>" href="<?= e(url('admin/dashboard')) ?>">Overview</a>
+                        <a class="<?= str_contains($requestPath, '/admin/bookings') ? 'active' : '' ?>" href="<?= e(url('admin/bookings')) ?>">Bookings</a>
+                        <a class="<?= str_contains($requestPath, '/admin/customers') ? 'active' : '' ?>" href="<?= e(url('admin/customers')) ?>">Customers</a>
                         <a class="<?= str_contains($requestPath, '/admin/organizers') ? 'active' : '' ?>" href="<?= e(url('admin/organizers')) ?>">Organizers</a>
                         <a class="<?= str_contains($requestPath, '/admin/events') ? 'active' : '' ?>" href="<?= e(url('admin/events')) ?>">Events</a>
                         <a class="<?= str_contains($requestPath, '/admin/hall') ? 'active' : '' ?>" href="<?= e(url('admin/hall')) ?>">Hall settings</a>
+                        <form class="sidebar-logout" method="post" action="<?= e(url('logout')) ?>">
+                            <?= csrf_field() ?>
+                            <button type="submit">Log out</button>
+                        </form>
                     <?php elseif ($role === 'organizer' && $currentUser['account_status'] === 'approved'): ?>
                         <a class="<?= $isAccountArea ? 'active' : '' ?>" href="<?= e(url('account')) ?>">Overview</a>
                         <a class="<?= str_contains($requestPath, '/organizer/events') ? 'active' : '' ?>" href="<?= e(url('organizer/events')) ?>">My events</a>
+                        <a class="<?= str_contains($requestPath, '/organizer/bookings') ? 'active' : '' ?>" href="<?= e(url('organizer/bookings')) ?>">Bookings</a>
+                        <form class="sidebar-logout" method="post" action="<?= e(url('logout')) ?>">
+                            <?= csrf_field() ?>
+                            <button type="submit">Log out</button>
+                        </form>
                     <?php elseif ($role === 'customer'): ?>
                         <a class="<?= $isAccountArea ? 'active' : '' ?>" href="<?= e(url('account')) ?>">Dashboard</a>
                         <a href="<?= e(url('events')) ?>">Browse events</a>

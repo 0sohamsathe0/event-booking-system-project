@@ -11,6 +11,7 @@ use App\Core\Session;
 use App\Core\View;
 use App\Repositories\OrganizerRepository;
 use App\Services\OrganizerManagementService;
+use App\Repositories\ManagementBookingRepository;
 use DomainException;
 
 final class AdminOrganizerController
@@ -36,6 +37,25 @@ final class AdminOrganizerController
     public function approve(int $id): void
     {
         $this->review($id, 'approved');
+    }
+
+    public function show(int $id): void
+    {
+        Authorization::requireAdmin();
+        $repository = new ManagementBookingRepository();
+        $organizer = $repository->organizer($id);
+        if ($organizer === null) {
+            http_response_code(404);
+            View::render('errors/404', ['pageTitle' => 'Organizer not found']);
+            return;
+        }
+        View::render('admin/organizers/show', [
+            'pageTitle' => $organizer['name'],
+            'organizer' => $organizer,
+            'metrics' => $repository->organizerMetrics($id),
+            'events' => $repository->organizerEvents($id),
+            'recentBookings' => $repository->forAdmin(['organizer_id' => $id, 'sort' => 'newest'], 1, 10),
+        ]);
     }
 
     public function reject(int $id): void
@@ -67,4 +87,3 @@ final class AdminOrganizerController
         Authorization::redirect('admin/organizers');
     }
 }
-

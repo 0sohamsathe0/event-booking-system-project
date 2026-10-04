@@ -61,10 +61,20 @@ that directory.
   booking-service regression coverage. Paid local checkout still requires
   Razorpay Test Mode credentials through environment variables or
   `config/payment.local.php`.
+- **Phase 13 – Organizer and Admin Booking Management:** Added ownership-scoped
+  organizer booking lists/details, platform-wide admin booking and customer
+  reporting, organizer/customer profile summaries, confirmed revenue and ticket
+  metrics, server-side search/filters/pagination, responsive management views,
+  and database-backed privacy and authorization regression coverage.
 
 ## Current phase
 
-**Phase 12 - Customer Frontend is complete.** Milestone 12.1 added the
+**Phase 13 - Organizer and Admin Booking Management is complete.** It adds
+read-only operational visibility without changing the booking or Razorpay
+mutation paths. Organizers see customer name/email and bookings only for events
+they own; admins see platform-wide bookings plus customer phone details. Revenue
+uses confirmed free bookings and captured paid bookings. Phase 12 previously
+completed the customer frontend: milestone 12.1 added the
 attendee dashboard, customer-scoped upcoming/recent/payable booking summaries,
 a read-only notification preview and unread count, and a consistent responsive
 customer navigation shell across account and booking pages. Milestone 12.2 added

@@ -63,7 +63,8 @@ selection.
 - An approved organizer can manage only their events, posters, and ticket types.
 - Editing an approved/rejected event or its tickets returns it to `pending` for
   admin reapproval.
-- Cannot yet request event cancellation or view bookings/revenue.
+- Can view booking/customer details and confirmed revenue only for events they
+  own; cannot request event cancellation or mutate bookings/payments.
 
 ### Admin or Hall Manager
 
@@ -72,8 +73,9 @@ selection.
   approve/reject events.
 - Event approval checks organizer state, ticket configuration, hall capacity,
   aggregate ticket capacity, and approved-event schedule overlap.
-- Cannot yet disable organizers, manage categories, process cancellations or
-  refunds, inspect payments, or view full reports.
+- Can inspect platform-wide booking and payment statuses plus customer/organizer
+  summaries; cannot yet disable organizers, manage categories, process
+  cancellations/refunds, or inspect sensitive provider records.
 
 ## Database architecture
 
@@ -127,6 +129,10 @@ Key relationships and constraints:
   links, and customer-scoped mark-one/mark-all-read controls
 - Customer-only profile management with validated name/phone updates, read-only
   email, and CSRF-protected Post/Redirect/Get handling
+- Organizer-owned booking search, filters, pagination, booking details, attendee
+  summaries, confirmed ticket/revenue metrics, and customer contact minimization
+- Admin-wide booking/customer reporting, customer and organizer profile
+  summaries, payment-status visibility, and commercial dashboard metrics
 - Dark responsive visual system with role accents and accessible focus states
 
 ## Current booking workflow
@@ -233,6 +239,8 @@ Organizer:
 - `GET /organizer/events`, `GET /organizer/events/create`
 - `POST /organizer/events`, `GET|POST /organizer/events/{id}/edit`
 - Ticket management under `/organizer/events/{eventId}/tickets`
+- `GET /organizer/bookings`, `GET /organizer/bookings/{id}`
+- `GET /organizer/events/{eventId}/bookings`
 
 Admin:
 
@@ -240,6 +248,9 @@ Admin:
 - `GET /admin/organizers` and organizer approve/reject POST routes
 - `GET /admin/events`, `GET /admin/events/{id}` and approve/reject POST routes
 - `GET|POST /admin/hall`
+- `GET /admin/bookings`, `GET /admin/bookings/{id}`
+- `GET /admin/customers`, `GET /admin/customers/{id}`
+- `GET /admin/organizers/{id}` - organizer profile and commercial summary
 
 ## Security architecture
 
@@ -361,11 +372,11 @@ Admin:
 - Planning docs describe 10-minute reservations; code/config uses 15 minutes.
 - Admin creation is manual; there is no installer or seed command.
 - The schema is a fresh import, not a migration system.
-- No broad automated test suite exists; focused database-backed coverage now
-  includes booking service/inventory behavior plus Phase 12.3 through 12.5
-  notification, booking-history, and profile behavior.
+- No broad HTTP automation suite exists; focused database-backed coverage now
+  includes booking service/inventory, management ownership/privacy, notification,
+  booking-history, and profile behavior.
 - The supplied directory has no `.git` metadata, so commits/branches are unknown.
-- All 79 PHP files, JavaScript syntax, and the booking-service, booking-history,
+- All 94 PHP files, JavaScript syntax, and the booking-service, management-reporting, booking-history,
   notification, and profile database tests currently pass. A live HTTP
   reproduction also confirms failed Razorpay order creation leaves no active
   hold. Real Razorpay Test Mode checkout and full multi-viewport QA remain
@@ -388,14 +399,13 @@ Admin:
 
 ## Last completed development milestone
 
-**Phase 12.5 - Customer Profile Management** is the latest completed milestone.
-It added customer-only name and phone editing, server validation, normalized
-phone storage, read-only email, CSRF-protected Post/Redirect/Get handling,
-active attendee navigation, responsive presentation, and database-backed
-customer/role isolation coverage. The later booking-engine stabilization fixed
-inventory release/finalization and expanded transactional regression coverage;
-it is a corrective maintenance change rather than a new numbered phase.
-Password changes remain intentionally deferred.
+**Phase 13 - Organizer and Admin Booking Management** is the latest completed
+milestone. It added ownership-scoped organizer booking visibility, admin-wide
+booking/customer reporting, organizer and customer detail summaries, confirmed
+revenue and ticket metrics, search/filter/pagination controls, responsive role
+navigation, and database-backed ownership/privacy tests. Organizer views expose
+customer name/email only; customer phone remains admin-only. Booking, inventory,
+and Razorpay mutation behavior was preserved.
 
 ## Recommended next task
 

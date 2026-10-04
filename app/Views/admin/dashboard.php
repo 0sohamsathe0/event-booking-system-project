@@ -14,6 +14,21 @@
             <article class="stat-card"><span>Pending events</span><strong><?= e($counts['pending_events']) ?></strong></article>
         </div>
 
+        <div class="panel-heading"><div><span class="eyebrow">Commercial overview</span><h2>Bookings and revenue</h2></div><div class="hero-actions"><a href="<?= e(url('admin/customers')) ?>">Customers</a><a href="<?= e(url('admin/bookings')) ?>">All bookings</a></div></div>
+        <div class="stat-grid">
+            <article class="stat-card"><span>All / confirmed bookings</span><strong><?= e($bookingMetrics['total_bookings']) ?> / <?= e($bookingMetrics['confirmed_bookings']) ?></strong></article>
+            <article class="stat-card"><span>Confirmed tickets</span><strong><?= e($bookingMetrics['confirmed_tickets']) ?></strong></article>
+            <article class="stat-card"><span>Confirmed revenue</span><strong><?= e(money($bookingMetrics['confirmed_revenue'])) ?></strong></article>
+            <article class="stat-card"><span>Pending / failed</span><strong><?= e($bookingMetrics['pending_bookings']) ?> / <?= e($bookingMetrics['failed_bookings']) ?></strong></article>
+        </div>
+
+        <div class="panel">
+            <div class="panel-heading"><h2>Recent bookings</h2><a href="<?= e(url('admin/bookings')) ?>">View all</a></div>
+            <?php if ($recentBookings === []): ?><p class="muted">No booking activity yet.</p><?php else: ?><div class="responsive-table"><table><thead><tr><th>Reference</th><th>Customer</th><th>Event</th><th>Status</th><th>Total</th></tr></thead><tbody>
+            <?php foreach ($recentBookings as $booking): ?><tr><td><a href="<?= e(url('admin/bookings/' . $booking['id'])) ?>"><strong><?= e($booking['booking_reference']) ?></strong></a><small><?= e(local_datetime($booking['booked_at'])) ?></small></td><td><?= e($booking['customer_name']) ?></td><td><?= e($booking['event_title']) ?></td><td><span class="status-badge status-<?= e($booking['status']) ?>"><?= e(str_replace('_', ' ', $booking['status'])) ?></span></td><td><?= e(money($booking['total_amount'])) ?></td></tr><?php endforeach; ?>
+            </tbody></table></div><?php endif; ?>
+        </div>
+
         <div class="panel">
             <div class="panel-heading"><h2>Pending organizer applications</h2><a href="<?= e(url('admin/organizers?status=pending')) ?>">View all</a></div>
             <?php if ($pendingOrganizers === []): ?>

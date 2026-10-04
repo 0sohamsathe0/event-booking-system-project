@@ -2,6 +2,12 @@
     <div class="page-heading"><div><span class="eyebrow">Event review</span><h1><?= e($event['title']) ?></h1></div><a class="button button-secondary" href="<?= e(url('admin/events')) ?>">All events</a></div>
     <?php if ($success): ?><div class="alert alert-success"><?= e($success) ?></div><?php endif; ?>
     <?php if ($error): ?><div class="alert alert-error"><?= e($error) ?></div><?php endif; ?>
+    <div class="stat-grid">
+        <article class="stat-card"><span>Confirmed bookings</span><strong><?= e($bookingMetrics['confirmed_bookings']) ?></strong></article>
+        <article class="stat-card"><span>Tickets sold</span><strong><?= e($bookingMetrics['confirmed_tickets']) ?></strong></article>
+        <article class="stat-card"><span>Unique attendees</span><strong><?= e($bookingMetrics['confirmed_customers']) ?></strong></article>
+        <article class="stat-card"><span>Confirmed revenue</span><strong><?= e(money($bookingMetrics['confirmed_revenue'])) ?></strong><a href="<?= e(url('admin/bookings?event=' . $event['id'])) ?>">View bookings</a></article>
+    </div>
     <div class="review-layout">
         <article class="panel">
             <?php if ($event['poster_path']): ?><img class="review-poster" src="<?= e(url($event['poster_path'])) ?>" alt="<?= e($event['title']) ?> poster"><?php endif; ?>
@@ -24,4 +30,3 @@
         </aside><?php endif; ?>
     </div>
 </div></section>
-

@@ -21,8 +21,9 @@
                         <h2><?= e($event['title']) ?></h2>
                         <p class="muted"><?= e(date('d M Y, h:i A', strtotime($event['start_datetime'] . ' UTC'))) ?> · <?= e($event['hall_name']) ?></p>
                         <p>Capacity: <?= e($event['event_capacity']) ?></p>
+                        <dl class="event-booking-metrics"><div><dt>Bookings</dt><dd><?= e($event['confirmed_bookings']) ?></dd></div><div><dt>Tickets</dt><dd><?= e($event['confirmed_tickets']) ?></dd></div><div><dt>Revenue</dt><dd><?= e(money($event['confirmed_revenue'])) ?></dd></div></dl>
                         <?php if ($event['status'] === 'rejected' && $event['rejection_reason']): ?><div class="alert alert-error">Reason: <?= e($event['rejection_reason']) ?></div><?php endif; ?>
-                        <?php if ($event['status'] !== 'cancelled'): ?><div class="hero-actions"><a class="button button-secondary button-compact" href="<?= e(url('organizer/events/' . $event['id'] . '/edit')) ?>">Edit event</a><a class="button button-compact" href="<?= e(url('organizer/events/' . $event['id'] . '/tickets')) ?>">Manage tickets</a></div><?php endif; ?>
+                        <div class="hero-actions"><a class="button button-secondary button-compact" href="<?= e(url('organizer/events/' . $event['id'] . '/bookings')) ?>">Bookings</a><?php if ($event['status'] !== 'cancelled'): ?><a class="button button-secondary button-compact" href="<?= e(url('organizer/events/' . $event['id'] . '/edit')) ?>">Edit</a><a class="button button-compact" href="<?= e(url('organizer/events/' . $event['id'] . '/tickets')) ?>">Tickets</a><?php endif; ?></div>
                     </div>
                 </article>
             <?php endforeach; ?>

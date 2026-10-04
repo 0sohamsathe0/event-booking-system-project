@@ -14,6 +14,12 @@ final class EventRepository
             "SELECT e.id, e.title, e.start_datetime, e.end_datetime,
                     e.event_capacity, e.status, e.poster_path, e.updated_at,
                     c.name AS category_name, h.name AS hall_name,
+                    (SELECT COUNT(*) FROM bookings b WHERE b.event_id = e.id AND b.status = 'confirmed') AS confirmed_bookings,
+                    (SELECT COALESCE(SUM(b.total_quantity), 0) FROM bookings b WHERE b.event_id = e.id AND b.status = 'confirmed') AS confirmed_tickets,
+                    (SELECT COALESCE(SUM(CASE WHEN b.total_amount = 0 OR EXISTS (
+                        SELECT 1 FROM payments p WHERE p.booking_id = b.id AND p.status = 'captured'
+                    ) THEN b.total_amount ELSE 0 END), 0)
+                     FROM bookings b WHERE b.event_id = e.id AND b.status = 'confirmed') AS confirmed_revenue,
                     (SELECT esh.reason FROM event_status_history esh
                      WHERE esh.event_id = e.id AND esh.new_status = 'rejected'
                      ORDER BY esh.created_at DESC, esh.id DESC LIMIT 1) AS rejection_reason
@@ -94,4 +100,3 @@ final class EventRepository
         ]);
     }
 }
-

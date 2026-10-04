@@ -17,6 +17,9 @@ use App\Controllers\BookingController;
 use App\Controllers\PaymentWebhookController;
 use App\Controllers\NotificationController;
 use App\Controllers\CustomerProfileController;
+use App\Controllers\OrganizerBookingController;
+use App\Controllers\AdminBookingController;
+use App\Controllers\AdminCustomerController;
 use App\Core\Router;
 
 /** @var Router $router */
@@ -54,6 +57,14 @@ $router->post('/organizer/events/{eventId}/tickets', [OrganizerTicketController:
 $router->post('/organizer/events/{eventId}/tickets/{ticketId}', [OrganizerTicketController::class, 'update']);
 $router->post('/organizer/events/{eventId}/tickets/{ticketId}/activate', [OrganizerTicketController::class, 'activate']);
 $router->post('/organizer/events/{eventId}/tickets/{ticketId}/deactivate', [OrganizerTicketController::class, 'deactivate']);
+$router->get('/organizer/bookings', [OrganizerBookingController::class, 'index']);
+$router->get('/organizer/bookings/{id}', [OrganizerBookingController::class, 'show']);
+$router->get('/organizer/events/{eventId}/bookings', [OrganizerBookingController::class, 'forEvent']);
+$router->get('/admin/bookings', [AdminBookingController::class, 'index']);
+$router->get('/admin/bookings/{id}', [AdminBookingController::class, 'show']);
+$router->get('/admin/customers', [AdminCustomerController::class, 'index']);
+$router->get('/admin/customers/{id}', [AdminCustomerController::class, 'show']);
+$router->get('/admin/organizers/{id}', [AdminOrganizerController::class, 'show']);
 $router->post('/events/{eventId}/book', [BookingController::class, 'store']);
 $router->get('/bookings', [BookingController::class, 'index']);
 $router->get('/bookings/{id}', [BookingController::class, 'show']);

@@ -10,6 +10,7 @@ use App\Core\Session;
 use App\Core\View;
 use App\Repositories\BookingRepository;
 use App\Repositories\NotificationRepository;
+use App\Repositories\ManagementBookingRepository;
 
 final class AccountController
 {
@@ -31,6 +32,20 @@ final class AccountController
                 'pendingBookings' => $bookings->payablePendingForCustomer($customerId),
                 'unreadNotificationCount' => $notifications->unreadCountForUser($customerId),
                 'recentNotifications' => $notifications->recentForUser($customerId),
+                'success' => Session::consumeFlash('success'),
+                'error' => Session::consumeFlash('error'),
+            ]);
+            return;
+        }
+
+        if (($user['role'] ?? null) === 'organizer' && ($user['account_status'] ?? null) === 'approved') {
+            $organizerId = Auth::id() ?? 0;
+            $bookings = new ManagementBookingRepository();
+            View::render('organizer/dashboard', [
+                'pageTitle' => 'Organizer dashboard',
+                'user' => $user,
+                'metrics' => $bookings->organizerMetrics($organizerId),
+                'recentBookings' => $bookings->recentForOrganizer($organizerId),
                 'success' => Session::consumeFlash('success'),
                 'error' => Session::consumeFlash('error'),
             ]);

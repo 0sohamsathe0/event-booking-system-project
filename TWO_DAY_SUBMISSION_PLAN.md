@@ -263,6 +263,7 @@ QA checklist:
 - [ ] Uploaded-poster limitations are communicated on Vercel.
 - [x] PHP lint passes locally (79 files).
 - [x] Focused database regression tests pass locally.
+- [x] Phase 13 organizer/admin booking ownership and reporting tests pass locally.
 - [ ] The deployed URL passes HTTP smoke checks.
 
 ### Block 5 — Documentation and submission package (1.5 hours)
@@ -365,6 +366,7 @@ The submission is complete when all of the following are true:
 - [ ] No secrets are committed.
 - [ ] All PHP files pass syntax lint.
 - [ ] Focused database tests pass.
+- [x] Organizer/admin booking reporting is ownership-scoped and manually smoke-tested.
 - [ ] README and project context match the deployed implementation.
 - [ ] Deferred features are documented honestly.
 

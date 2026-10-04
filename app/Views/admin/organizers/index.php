@@ -19,7 +19,7 @@
             <?php if ($organizers === []): ?><p class="muted">No organizers match this filter.</p><?php else: ?>
             <div class="responsive-table"><table><thead><tr><th>Organizer</th><th>Contact</th><th>Status</th><th>Applied</th><th>Review</th></tr></thead><tbody>
             <?php foreach ($organizers as $organizer): ?><tr>
-                <td><strong><?= e($organizer['name']) ?></strong><small>ID #<?= e($organizer['id']) ?></small></td>
+                <td><a href="<?= e(url('admin/organizers/' . $organizer['id'])) ?>"><strong><?= e($organizer['name']) ?></strong></a><small>ID #<?= e($organizer['id']) ?></small></td>
                 <td><?= e($organizer['email']) ?><small><?= e($organizer['phone']) ?></small></td>
                 <td><span class="status-badge status-<?= e($organizer['account_status']) ?>"><?= e(ucfirst($organizer['account_status'])) ?></span></td>
                 <td><?= e(date('d M Y', strtotime($organizer['created_at'] . ' UTC'))) ?></td>
@@ -44,4 +44,3 @@
         </div>
     </div>
 </section>
-

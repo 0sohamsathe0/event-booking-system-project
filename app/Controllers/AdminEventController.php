@@ -10,6 +10,7 @@ use App\Core\Session;
 use App\Core\View;
 use App\Repositories\AdminEventRepository;
 use App\Services\EventApprovalService;
+use App\Repositories\ManagementBookingRepository;
 use DomainException;
 
 final class AdminEventController
@@ -38,6 +39,7 @@ final class AdminEventController
         }
         View::render('admin/events/show', [
             'pageTitle' => 'Review event', 'event' => $event,
+            'bookingMetrics' => (new ManagementBookingRepository())->organizerMetrics((int) $event['organizer_id'], $id),
             'success' => Session::consumeFlash('success'), 'error' => Session::consumeFlash('error'),
         ]);
     }
@@ -69,4 +71,3 @@ final class AdminEventController
         Authorization::redirect('admin/events/' . $id);
     }
 }
-
