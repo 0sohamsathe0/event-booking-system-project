@@ -6,8 +6,8 @@
 This is a single-hall event booking and management system. Visitors discover
 approved events, customers reserve and buy tickets, organizers submit events
 and ticket types, and a hall manager approves organizers and protects the hall
-schedule. V1 uses Razorpay for online INR payments and does not include seat
-selection.
+schedule. V1 uses Razorpay for online INR payments. Customers do not select a
+seat map; confirmed bookings receive concurrency-safe sequential seat numbers.
 
 ## Technology stack
 
@@ -30,8 +30,10 @@ selection.
 - `app/Support/helpers.php` - escaping, URLs, CSRF fields, dates, and money
 - `bootstrap/app.php` - autoloading and application bootstrap
 - `config/` - application, database, payment, and poster-storage configuration
-- `database/event_booking_system.sql` - complete 14-table schema and categories
+- `database/event_booking_system.sql` - complete 17-table schema and categories
 - `database/phase_14_upgrade.sql` - additive Phase 13 to Phase 14 upgrade
+- `database/phase_15_ticket_issuance.sql` - additive issued-ticket/seat upgrade
+- `database/phase_16_cancellations_refunds.sql` - cancellation/refund and reusable-seat upgrade
 - `public/` - front controller, `.htaccess`, CSS, JavaScript, and event posters
 - `routes/web.php` - all registered GET and POST routes
 - `storage/` - ignored local sessions and logs
@@ -50,13 +52,14 @@ selection.
 
 - Can reserve up to 10 tickets across an event's ticket types.
 - Can confirm free bookings or pay through Razorpay.
+- Receives one uniquely coded ticket and assigned seat per confirmed quantity.
 - Can view booking history, booking details, and resume pending checkout.
 - Can view customer-owned notification history, distinguish unread records, and
   mark one or all notifications as read.
 - Can update their own name and phone from a customer-only profile page; email is
   read-only in the submission build.
-- Cannot yet change a password, cancel a confirmed booking, or request/track a
-  refund.
+- Can cancel quantities by ticket type before the 48-hour cutoff and track the
+  resulting Test Mode refund; password changes remain deferred.
 
 ### Organizer
 
@@ -65,8 +68,9 @@ selection.
 - An approved organizer can manage only their events, posters, and ticket types.
 - Editing an approved/rejected event or its tickets returns it to `pending` for
   admin reapproval.
-- Can view booking/customer details and confirmed revenue only for events they
-  own; cannot request event cancellation or mutate bookings/payments.
+- Can view booking/customer/refund details only for events they own and submit
+  or withdraw event-cancellation requests; cannot approve cancellation or
+  mutate refunds directly.
 
 ### Admin or Hall Manager
 
@@ -75,15 +79,15 @@ selection.
   approve/reject events.
 - Event approval checks organizer state, ticket configuration, hall capacity,
   aggregate ticket capacity, and approved-event schedule overlap.
-- Can inspect platform-wide booking and payment statuses plus customer/organizer
-  summaries; cannot yet disable organizers, manage categories, process
-  cancellations/refunds, or inspect sensitive provider records.
+- Can inspect platform-wide booking/payment/refund statuses, review organizer
+  event-cancellation requests, and retry queued/failed Test Mode refunds;
+  cannot yet disable organizers, manage categories, or expose secrets.
 
 ## Database architecture
 
-The schema defines 14 InnoDB tables. Phase 14 adds `sessions` for production
-PHP session persistence and adds nullable poster-provider/public-ID metadata to
-`events`; all earlier booking and payment structures remain unchanged.
+The schema defines 17 InnoDB tables. Phase 14 adds `sessions` for production
+PHP session persistence and nullable poster-provider/public-ID metadata to
+`events`. The ticket issuance upgrade additively introduces `issued_tickets`.
 
 1. `users` - all roles, passwords, account status, and organizer review data
 2. `halls` - venue identity, contact details, and maximum capacity
@@ -93,18 +97,23 @@ PHP session persistence and adds nullable poster-provider/public-ID metadata to
 6. `ticket_types` - price, capacity, reserved/sold counters, and active state
 7. `bookings` - customer/event order, reference, totals, status, and expiry
 8. `booking_items` - ticket quantities and unit-price snapshots
-9. `payments` - Razorpay order/payment IDs and payment state
-10. `refunds` - planned refund state and provider identifiers
-11. `payment_webhook_events` - webhook idempotency and retained payloads
-12. `event_cancellation_requests` - planned organizer/admin cancellation flow
-13. `notifications` - per-user messages and optional event/booking links
-14. `sessions` - production PHP session payload and expiry metadata
+9. `issued_tickets` - unique ticket codes, event-wide seats, and issue state
+10. `payments` - Razorpay order/payment IDs and payment state
+11. `refunds` - idempotent refund state, policy, attempts, and provider identifiers
+12. `payment_webhook_events` - webhook idempotency and retained payloads
+13. `event_cancellation_requests` - organizer request and admin decision flow
+14. `booking_cancellation_actions` - idempotent customer cancellation submissions
+15. `ticket_cancellations` - per-ticket cancellation/refund audit records
+16. `notifications` - per-user messages and optional event/booking links
+17. `sessions` - production PHP session payload and expiry metadata
 
 Key relationships and constraints:
 
 - One organizer, hall, and category can relate to many events.
 - An event has many ticket types, bookings, and status-history rows.
 - A customer has many bookings; a booking has items and payment attempts.
+- A confirmed booking has one issued-ticket row per booked attendee; event and
+  seat number plus every ticket code are unique.
 - Composite foreign keys ensure booking items reference tickets from the same
   event as their booking.
 - Ticket inventory must satisfy `reserved_quantity + sold_quantity <= capacity`.
@@ -173,16 +182,21 @@ Key relationships and constraints:
    the sales window and availability, and calculates prices from the database.
 6. It creates a `pending_payment` booking and item price snapshots, increments
    reserved inventory, and sets a configurable expiry (currently 15 minutes).
-7. Free bookings immediately move reserved inventory to sold and confirm.
+7. Free bookings immediately move reserved inventory to sold, confirm, and
+   issue one unique ticket/seat per booked quantity.
 8. Paid bookings create a local payment row, commit database locks, then create
    a Razorpay Order.
 9. Checkout returns order/payment/signature values. The server verifies the HMAC,
    fetches the payment from Razorpay, and checks order, amount, INR, and captured
-   state before confirming transactionally.
+   state before confirming and issuing tickets transactionally.
 10. A signed `payment.captured` webhook can confirm the booking when the browser
-    callback is interrupted.
+    callback is interrupted and uses the same idempotent ticket issuance path.
 11. Manual checkout cancellation or order-creation failure releases inventory.
-12. Confirmed-booking cancellation and refunds are not implemented.
+12. Customers may cancel ticket quantities until 48 hours before the event;
+    cancelled inventory and seats are restored transactionally and eligible
+    paid value is refunded through Razorpay Test Mode.
+13. Organizer event cancellation requires admin approval and queues full refunds
+    for remaining valid paid tickets in bounded batches.
 
 ### Booking-engine stabilization (October 2026)
 
@@ -204,19 +218,20 @@ Key relationships and constraints:
 
 ## Razorpay architecture
 
-- `RazorpayService` calls `/orders` and `/payments/{id}` with cURL and Basic Auth.
+- `RazorpayService` calls orders, payment lookup, payment-refund, and refund-list
+  endpoints with cURL and Basic Auth.
 - Secret credentials come from process environment variables or an optional
   `config/payment.local.php`; only the public key ID is sent to Checkout.
 - Callback signature: HMAC-SHA256 of `order_id|payment_id` using the key secret.
 - Callback confirmation also fetches the remote payment and verifies amount,
   currency, order ID, and `captured` status.
 - `PaymentWebhookService` verifies the raw-body webhook HMAC, requires a provider
-  event ID, records its payload/hash, rejects duplicates, and processes only
-  `payment.captured`.
+  event ID, records its payload/hash, rejects duplicates, and processes
+  `payment.captured`, `refund.created`, `refund.processed`, and `refund.failed`.
 - Payments store local/provider IDs, amount, state, capture time, signature time,
   and failure description.
-- Refund tables/design exist, but no refund API call, service, route, UI, retry,
-  or refund webhook handling exists.
+- Refunds use normal speed, provider-supported idempotency headers, immutable
+  local references, bounded admin batches, and Test Mode-only credential guards.
 
 ## Important business rules
 
@@ -394,8 +409,8 @@ Admin:
   there is no reconciliation or automatic refund path.
 - Organizers may edit live approved events/tickets, moving them to pending while
   existing bookings or checkouts exist.
-- `disabled`, cancellation, refund, and several payment/webhook states exist in
-  the schema without application workflows.
+- Organizer disabling and several payment failure/reconciliation states still
+  exist without full application workflows.
 - Planning docs describe 10-minute reservations; code/config uses 15 minutes.
 - Admin creation is manual; there is no installer or seed command.
 - The schema is a fresh import, not a migration system.
@@ -418,13 +433,38 @@ Admin:
    pixels when browser control is available.
 5. Implement customer password changes after the submission-critical deployment
    path is healthy.
-6. Implement customer cancellation with transactional inventory restoration.
-7. Implement organizer event-cancellation requests and admin review.
-8. Implement idempotent Razorpay refunds, retry handling, and refund webhooks.
-9. Add organizer booking/revenue views and admin operational reports.
-10. Add production configuration, HTTPS/security headers, rate limiting, and QA.
+6. Apply and verify the Phase 16 cancellation/refund migration.
+7. Exercise customer partial cancellation and event cancellation with Razorpay Test Mode.
+8. Add scheduled reservation/refund reconciliation for unattended production operation.
+9. Complete Vercel Preview deployment verification.
+10. Add rate limiting, backups, and production monitoring.
 
-## Last completed development milestone
+## Phase 16 implementation - Ticket Cancellation and Refunds
+
+- Customers cancel quantities per ticket type from their own confirmed or
+  partially cancelled booking. The server deterministically cancels the
+  highest-numbered valid seats in the selected type.
+- The fixed policy is 100% at least seven days before start, 50% from seven
+  days to the 48-hour cutoff, and unavailable inside 48 hours. Free tickets use
+  the same cutoff without creating a provider refund.
+- Per-ticket cancellation records preserve original price, percentage, refund
+  amount, actor, source, reason, and refund association. Original booking totals
+  remain immutable.
+- Cancelled inventory is restored under row locks. Cancelled seats become
+  available again while historical ticket records remain intact.
+- Razorpay normal refunds are Test Mode only, store a stable idempotency key,
+  use bounded retry batches, and reconcile `refund.created`,
+  `refund.processed`, and `refund.failed` webhooks.
+- Organizers submit or withdraw event-cancellation requests. Admin approval
+  closes the event, releases pending reservations, cancels remaining valid
+  tickets, queues 100% refunds, and sends role-appropriate notifications.
+- Admin refund management adds search, status/source filters, pagination,
+  individual retry, batch processing, and safe operational messages.
+- `database/phase_16_cancellations_refunds.sql` is required on an existing
+  Phase 15 database. Database-backed verification remains pending until MySQL
+  is reachable in the current environment.
+
+## Last completed deployment milestone
 
 **Phase 14 - Production/Vercel Compatibility** is implemented and locally
 verified. It adds production configuration, external MySQL/TLS support,

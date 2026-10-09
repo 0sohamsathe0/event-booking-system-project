@@ -335,11 +335,21 @@ Use separate focused requests in this order:
 This sequence limits repeated context, gives every turn a measurable completion
 condition, and preserves recovery points if the conversation is compacted.
 
+### Post-plan completed enhancement
+
+Confirmed paid and free bookings now issue one unique ticket and automatic
+event-wide seat number per quantity. Browser callbacks and signed Razorpay
+webhooks share the same transactional, idempotent issuance service, and the
+customer, organizer, and admin booking-detail pages show the issued tickets.
+
+Phase 16 now adds quantity-based customer ticket cancellation, transactional
+inventory restoration, reusable seats, organizer event-cancellation requests,
+admin approval, Razorpay Test Mode partial/full refunds, webhook reconciliation,
+idempotent retries, and refund reporting. The Phase 16 SQL upgrade and full
+database-backed regression run remain required before deployment.
+
 ## Features intentionally deferred
 
-- Confirmed-booking cancellation
-- Organizer event-cancellation requests
-- Razorpay refunds and refund webhooks
 - Payment reconciliation beyond the existing callback/webhook behavior
 - Organizer revenue analytics
 - Advanced admin reporting
@@ -362,6 +372,7 @@ The submission is complete when all of the following are true:
 - [ ] Admin, organizer, and customer authorization works.
 - [ ] An approved event can be discovered and booked.
 - [ ] A Razorpay Test Mode payment confirms a booking.
+- [ ] Each confirmed quantity produces one unique ticket and assigned seat.
 - [ ] Callback and webhook verification do not double-sell inventory.
 - [ ] Booking history and notification history work for the owning customer.
 - [ ] No secrets are committed.

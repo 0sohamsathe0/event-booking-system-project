@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Core\Database;
 use App\Core\Config;
 use App\Core\ConfigurationValidator;
+use App\Core\EnvironmentLoader;
 use App\Core\Session;
 
 define('BASE_PATH', dirname(__DIR__));
@@ -24,12 +25,19 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
+$loadEnvironmentFile = PHP_SAPI !== 'cli'
+    || filter_var(getenv('APP_LOAD_ENV_FILE') ?: false, FILTER_VALIDATE_BOOL);
+if ($loadEnvironmentFile) {
+    EnvironmentLoader::load(BASE_PATH . '/.env');
+}
+
 require BASE_PATH . '/app/Support/helpers.php';
 
 $appConfig = require BASE_PATH . '/config/app.php';
 $databaseConfig = require BASE_PATH . '/config/database.php';
 $paymentConfig = require BASE_PATH . '/config/payment.php';
 $storageConfig = require BASE_PATH . '/config/storage.php';
+$cancellationConfig = require BASE_PATH . '/config/cancellation.php';
 
 if ($appConfig['environment'] !== 'production' && is_file(BASE_PATH . '/config/database.local.php')) {
     $databaseConfig = array_replace($databaseConfig, require BASE_PATH . '/config/database.local.php');
@@ -50,6 +58,18 @@ foreach ($databaseEnvironment as $key => $environmentKey) {
     }
 }
 
+$sslCa = trim((string) ($databaseConfig['ssl_ca'] ?? ''));
+if (str_starts_with($sslCa, '-----BEGIN CERTIFICATE-----')) {
+    $temporaryCa = rtrim(sys_get_temp_dir(), '/\\')
+        . DIRECTORY_SEPARATOR . 'event-booking-db-ca-' . hash('sha256', $sslCa) . '.pem';
+    if (!is_file($temporaryCa) && file_put_contents($temporaryCa, $sslCa, LOCK_EX) === false) {
+        throw new RuntimeException('The database CA certificate could not be prepared.');
+    }
+    $databaseConfig['ssl_ca'] = $temporaryCa;
+} elseif ($sslCa !== '' && !preg_match('#^(?:[A-Za-z]:[\\\\/]|/)#', $sslCa)) {
+    $databaseConfig['ssl_ca'] = BASE_PATH . '/' . ltrim(str_replace('\\', '/', $sslCa), '/');
+}
+
 foreach (['RAZORPAY_KEY_ID' => 'key_id', 'RAZORPAY_KEY_SECRET' => 'key_secret',
     'RAZORPAY_WEBHOOK_SECRET' => 'webhook_secret'] as $environmentKey => $key) {
     $value = getenv($environmentKey);
@@ -63,6 +83,7 @@ Config::set('app', $appConfig);
 Config::set('database', $databaseConfig);
 Config::set('payment', $paymentConfig);
 Config::set('storage', $storageConfig);
+Config::set('cancellation', $cancellationConfig);
 
 ini_set('log_errors', '1');
 ini_set('display_errors', $appConfig['debug'] ? '1' : '0');

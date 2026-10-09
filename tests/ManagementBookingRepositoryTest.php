@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Core\Database;
 use App\Repositories\ManagementBookingRepository;
+use App\Services\TicketIssuanceService;
 
 require dirname(__DIR__) . '/bootstrap/app.php';
 
@@ -101,6 +102,11 @@ try {
         )->execute(['booking_id' => $bookingId, 'event_id' => $eventId, 'ticket_id' => $ticketId, 'quantity' => $quantity, 'unit_price' => $unitPrice]);
     }
     [$bookingA, $bookingFree, $bookingB] = $bookingIds;
+
+    $ticketIssuance = new TicketIssuanceService();
+    foreach ($bookingIds as $bookingId) {
+        $ticketIssuance->issueForConfirmedBooking($bookingId);
+    }
 
     $payment = $database->prepare(
         "INSERT INTO payments (booking_id, provider_order_id, provider_payment_id, amount, status, created_at)

@@ -11,8 +11,12 @@ use App\Core\Session;
 use App\Core\Logger;
 use App\Core\View;
 use App\Repositories\BookingRepository;
+use App\Repositories\IssuedTicketRepository;
 use App\Repositories\NotificationRepository;
+use App\Repositories\CancellationRepository;
 use App\Services\BookingService;
+use App\Services\BookingCancellationService;
+use App\Services\CancellationPolicy;
 use DateTimeImmutable;
 use DateTimeZone;
 use DomainException;
@@ -24,6 +28,7 @@ final class BookingController
         'any',
         'pending_payment',
         'confirmed',
+        'partially_cancelled',
         'payment_failed',
         'expired',
         'customer_cancelled',
@@ -132,12 +137,64 @@ final class BookingController
             $this->notFound();
             return;
         }
+        $cancellations = new CancellationRepository();
+        $cancellationOptions = $cancellations->customerOptions($id, Auth::id() ?? 0);
+        $canCancel = in_array($booking['status'], ['confirmed', 'partially_cancelled'], true)
+            && $cancellationOptions !== [];
+        $refundPercentage = null;
+        $cancellationUnavailableReason = null;
+        if ($canCancel) {
+            try {
+                $refundPercentage = (new CancellationPolicy())->customerRefundPercentage((string) $booking['start_datetime']);
+            } catch (DomainException $exception) {
+                $canCancel = false;
+                $cancellationUnavailableReason = $exception->getMessage();
+            }
+        }
+        $cancellationRequestToken = $canCancel ? bin2hex(random_bytes(32)) : null;
         View::render('bookings/show', [
             'pageTitle' => 'Booking ' . $booking['booking_reference'],
             'booking' => $booking, 'items' => $repository->items($id),
+            'issuedTickets' => (new IssuedTicketRepository())->forCustomerBooking($id, Auth::id() ?? 0),
+            'cancellationOptions' => $cancellationOptions,
+            'refunds' => $cancellations->refundsForBooking($id),
+            'canCancel' => $canCancel,
+            'refundPercentage' => $refundPercentage,
+            'cancellationUnavailableReason' => $cancellationUnavailableReason,
+            'cancellationRequestToken' => $cancellationRequestToken,
             'success' => Session::consumeFlash('success'), 'error' => Session::consumeFlash('error'),
             'unreadNotificationCount' => $this->unreadNotificationCount(),
         ]);
+    }
+
+    public function cancel(int $id): never
+    {
+        Authorization::requireRole('customer');
+        $this->verifyCsrf();
+        try {
+            $result = (new BookingCancellationService())->cancel(
+                $id,
+                Auth::id() ?? 0,
+                is_array($_POST['quantities'] ?? null) ? $_POST['quantities'] : [],
+                is_string($_POST['reason'] ?? null) ? $_POST['reason'] : null,
+                is_string($_POST['request_token'] ?? null) ? $_POST['request_token'] : ''
+            );
+            $message = $result['duplicate']
+                ? 'This cancellation was already processed.'
+                : $result['cancelled_quantity'] . ' ticket(s) cancelled.';
+            if ($result['refund_status'] === 'not_required') {
+                $message .= ' No payment refund was required.';
+            } elseif ($result['refund_status'] === 'failed') {
+                $message .= ' The Test Mode refund is queued for admin retry.';
+            } else {
+                $message .= ' A ' . $result['refund_percentage'] . '% Test Mode refund of '
+                    . money($result['refund_amount']) . ' was started.';
+            }
+            Session::flash('success', $message);
+        } catch (Throwable $exception) {
+            $this->handleError($exception, 'The selected tickets could not be cancelled.');
+        }
+        Authorization::redirect('bookings/' . $id);
     }
 
     private function verifyCsrf(): void

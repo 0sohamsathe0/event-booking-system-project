@@ -58,16 +58,19 @@ final class ManagementBookingRepository
             $parameters['event_id'] = $eventId;
         }
         $statement = Database::connection()->prepare(
-            "SELECT COUNT(DISTINCT CASE WHEN b.status = 'confirmed' THEN b.id END) AS confirmed_bookings,
-                    COALESCE(SUM(CASE WHEN b.status = 'confirmed' THEN b.total_quantity ELSE 0 END), 0) AS confirmed_tickets,
-                    COUNT(DISTINCT CASE WHEN b.status = 'confirmed' THEN b.customer_id END) AS confirmed_customers,
-                    COALESCE(SUM(CASE WHEN b.status = 'confirmed'
-                        AND (b.total_amount = 0 OR EXISTS (
-                            SELECT 1 FROM payments cp
-                            WHERE cp.booking_id = b.id AND cp.status = 'captured'
-                        )) THEN b.total_amount ELSE 0 END), 0) AS confirmed_revenue
+            "SELECT COUNT(DISTINCT CASE WHEN b.status IN ('confirmed', 'partially_cancelled') THEN b.id END) AS confirmed_bookings,
+                    COALESCE(SUM(CASE WHEN b.status IN ('confirmed', 'partially_cancelled') THEN
+                        (SELECT COUNT(*) FROM issued_tickets it WHERE it.booking_id = b.id AND it.status = 'valid') ELSE 0 END), 0) AS confirmed_tickets,
+                    COUNT(DISTINCT CASE WHEN b.status IN ('confirmed', 'partially_cancelled') THEN b.customer_id END) AS confirmed_customers,
+                    COALESCE(SUM(CASE WHEN p.status IN ('captured', 'partially_refunded', 'refunded')
+                        THEN p.amount - COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.payment_id = p.id AND r.status = 'processed'), 0)
+                        ELSE 0 END), 0) AS confirmed_revenue
              FROM events e
              LEFT JOIN bookings b ON b.event_id = e.id
+             LEFT JOIN payments p ON p.id = (
+                 SELECT p2.id FROM payments p2 WHERE p2.booking_id = b.id
+                 ORDER BY p2.created_at DESC, p2.id DESC LIMIT 1
+             )
              WHERE e.organizer_id = :organizer_id{$eventClause}"
         );
         $statement->execute($parameters);
@@ -78,16 +81,19 @@ final class ManagementBookingRepository
     {
         $row = Database::connection()->query(
             "SELECT COUNT(*) AS total_bookings,
-                    SUM(b.status = 'confirmed') AS confirmed_bookings,
-                    COALESCE(SUM(CASE WHEN b.status = 'confirmed' THEN b.total_quantity ELSE 0 END), 0) AS confirmed_tickets,
+                    SUM(b.status IN ('confirmed', 'partially_cancelled')) AS confirmed_bookings,
+                    COALESCE(SUM(CASE WHEN b.status IN ('confirmed', 'partially_cancelled') THEN
+                        (SELECT COUNT(*) FROM issued_tickets it WHERE it.booking_id = b.id AND it.status = 'valid') ELSE 0 END), 0) AS confirmed_tickets,
                     SUM(b.status = 'pending_payment') AS pending_bookings,
                     SUM(b.status IN ('payment_failed', 'expired')) AS failed_bookings,
-                    COALESCE(SUM(CASE WHEN b.status = 'confirmed'
-                        AND (b.total_amount = 0 OR EXISTS (
-                            SELECT 1 FROM payments cp
-                            WHERE cp.booking_id = b.id AND cp.status = 'captured'
-                        )) THEN b.total_amount ELSE 0 END), 0) AS confirmed_revenue
-             FROM bookings b"
+                    COALESCE(SUM(CASE WHEN p.status IN ('captured', 'partially_refunded', 'refunded')
+                        THEN p.amount - COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.payment_id = p.id AND r.status = 'processed'), 0)
+                        ELSE 0 END), 0) AS confirmed_revenue
+             FROM bookings b
+             LEFT JOIN payments p ON p.id = (
+                 SELECT p2.id FROM payments p2 WHERE p2.booking_id = b.id
+                 ORDER BY p2.created_at DESC, p2.id DESC LIMIT 1
+             )"
         )->fetch() ?: [];
 
         return [
@@ -139,14 +145,18 @@ final class ManagementBookingRepository
         $statement = Database::connection()->prepare(
             "SELECT u.id, u.name, u.email, u.phone, u.account_status, u.created_at,
                     COUNT(b.id) AS booking_count,
-                    COALESCE(SUM(b.status = 'confirmed'), 0) AS confirmed_bookings,
-                    COALESCE(SUM(CASE WHEN b.status = 'confirmed' THEN b.total_quantity ELSE 0 END), 0) AS confirmed_tickets,
-                    COALESCE(SUM(CASE WHEN b.status = 'confirmed'
-                        AND (b.total_amount = 0 OR EXISTS (
-                            SELECT 1 FROM payments cp WHERE cp.booking_id = b.id AND cp.status = 'captured'
-                        )) THEN b.total_amount ELSE 0 END), 0) AS confirmed_spend
+                    COALESCE(SUM(b.status IN ('confirmed', 'partially_cancelled')), 0) AS confirmed_bookings,
+                    COALESCE(SUM(CASE WHEN b.status IN ('confirmed', 'partially_cancelled') THEN
+                        (SELECT COUNT(*) FROM issued_tickets it WHERE it.booking_id = b.id AND it.status = 'valid') ELSE 0 END), 0) AS confirmed_tickets,
+                    COALESCE(SUM(CASE WHEN cp.status IN ('captured', 'partially_refunded', 'refunded')
+                        THEN cp.amount - COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.payment_id = cp.id AND r.status = 'processed'), 0)
+                        ELSE 0 END), 0) AS confirmed_spend
              FROM users u
              LEFT JOIN bookings b ON b.customer_id = u.id
+             LEFT JOIN payments cp ON cp.id = (
+                 SELECT p2.id FROM payments p2 WHERE p2.booking_id = b.id
+                 ORDER BY p2.created_at DESC, p2.id DESC LIMIT 1
+             )
              WHERE " . implode(' AND ', $where) . "
              GROUP BY u.id, u.name, u.email, u.phone, u.account_status, u.created_at
              ORDER BY u.created_at DESC, u.id DESC
@@ -171,14 +181,18 @@ final class ManagementBookingRepository
         $statement = Database::connection()->prepare(
             "SELECT u.id, u.name, u.email, u.phone, u.account_status, u.created_at,
                     COUNT(b.id) AS booking_count,
-                    COALESCE(SUM(b.status = 'confirmed'), 0) AS confirmed_bookings,
-                    COALESCE(SUM(CASE WHEN b.status = 'confirmed' THEN b.total_quantity ELSE 0 END), 0) AS confirmed_tickets,
-                    COALESCE(SUM(CASE WHEN b.status = 'confirmed'
-                        AND (b.total_amount = 0 OR EXISTS (
-                            SELECT 1 FROM payments cp WHERE cp.booking_id = b.id AND cp.status = 'captured'
-                        )) THEN b.total_amount ELSE 0 END), 0) AS confirmed_spend
+                    COALESCE(SUM(b.status IN ('confirmed', 'partially_cancelled')), 0) AS confirmed_bookings,
+                    COALESCE(SUM(CASE WHEN b.status IN ('confirmed', 'partially_cancelled') THEN
+                        (SELECT COUNT(*) FROM issued_tickets it WHERE it.booking_id = b.id AND it.status = 'valid') ELSE 0 END), 0) AS confirmed_tickets,
+                    COALESCE(SUM(CASE WHEN cp.status IN ('captured', 'partially_refunded', 'refunded')
+                        THEN cp.amount - COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.payment_id = cp.id AND r.status = 'processed'), 0)
+                        ELSE 0 END), 0) AS confirmed_spend
              FROM users u
              LEFT JOIN bookings b ON b.customer_id = u.id
+             LEFT JOIN payments cp ON cp.id = (
+                 SELECT p2.id FROM payments p2 WHERE p2.booking_id = b.id
+                 ORDER BY p2.created_at DESC, p2.id DESC LIMIT 1
+             )
              WHERE u.id = :id AND u.role = 'customer'
              GROUP BY u.id, u.name, u.email, u.phone, u.account_status, u.created_at
              LIMIT 1"
@@ -218,7 +232,7 @@ final class ManagementBookingRepository
                     e.id AS event_id, e.title AS event_title, e.start_datetime,
                     o.id AS organizer_id, o.name AS organizer_name,
                     cu.id AS customer_id, cu.name AS customer_name, cu.email AS customer_email{$customerPhone},
-                    CASE WHEN b.status = 'confirmed' AND b.total_amount = 0 THEN 'not_required'
+                    CASE WHEN b.total_amount = 0 THEN 'not_required'
                          ELSE COALESCE(p.status, 'not_started') END AS payment_status
              FROM bookings b
              JOIN events e ON e.id = b.event_id
@@ -262,7 +276,7 @@ final class ManagementBookingRepository
             "SELECT b.*, e.title AS event_title, e.start_datetime, e.end_datetime,
                     o.id AS organizer_id, o.name AS organizer_name, o.email AS organizer_email,
                     cu.id AS customer_id, cu.name AS customer_name, cu.email AS customer_email{$customerPhone},
-                    CASE WHEN b.status = 'confirmed' AND b.total_amount = 0 THEN 'not_required'
+                    CASE WHEN b.total_amount = 0 THEN 'not_required'
                          ELSE COALESCE(p.status, 'not_started') END AS payment_status,
                     p.captured_at
              FROM bookings b
@@ -315,7 +329,7 @@ final class ManagementBookingRepository
         }
         if (($filters['payment_status'] ?? 'any') !== 'any') {
             if ($filters['payment_status'] === 'not_required') {
-                $where[] = "b.status = 'confirmed' AND b.total_amount = 0";
+                $where[] = 'b.total_amount = 0';
             } elseif ($filters['payment_status'] === 'not_started') {
                 $where[] = 'p.id IS NULL';
             } else {

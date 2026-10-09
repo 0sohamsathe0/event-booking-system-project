@@ -202,6 +202,7 @@ CREATE TABLE IF NOT EXISTS `bookings` (
     `status` ENUM(
         'pending_payment',
         'confirmed',
+        'partially_cancelled',
         'payment_failed',
         'expired',
         'customer_cancelled',
@@ -263,6 +264,42 @@ CREATE TABLE IF NOT EXISTS `booking_items` (
         CHECK (`unit_price` >= 0)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS `issued_tickets` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `ticket_code` VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    `booking_id` BIGINT UNSIGNED NOT NULL,
+    `booking_item_id` BIGINT UNSIGNED NOT NULL,
+    `event_id` BIGINT UNSIGNED NOT NULL,
+    `ticket_type_id` BIGINT UNSIGNED NOT NULL,
+    `seat_number` INT UNSIGNED NOT NULL,
+    `status` ENUM('valid', 'used', 'cancelled') NOT NULL DEFAULT 'valid',
+    `active_seat_slot` TINYINT UNSIGNED NULL DEFAULT 1,
+    `issued_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_issued_tickets_code` (`ticket_code`),
+    UNIQUE KEY `uq_issued_tickets_active_event_seat`
+        (`event_id`, `seat_number`, `active_seat_slot`),
+    KEY `idx_issued_tickets_booking` (`booking_id`, `seat_number`),
+    KEY `idx_issued_tickets_booking_item` (`booking_item_id`),
+    KEY `idx_issued_tickets_ticket_type` (`ticket_type_id`),
+    CONSTRAINT `fk_issued_tickets_booking`
+        FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`)
+        ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT `fk_issued_tickets_booking_item`
+        FOREIGN KEY (`booking_item_id`) REFERENCES `booking_items` (`id`)
+        ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT `fk_issued_tickets_event`
+        FOREIGN KEY (`event_id`) REFERENCES `events` (`id`)
+        ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT `fk_issued_tickets_ticket_type`
+        FOREIGN KEY (`ticket_type_id`) REFERENCES `ticket_types` (`id`)
+        ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT `chk_issued_tickets_seat_positive`
+        CHECK (`seat_number` > 0),
+    CONSTRAINT `chk_issued_tickets_active_seat_slot`
+        CHECK (`active_seat_slot` IS NULL OR `active_seat_slot` = 1)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS `payments` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `booking_id` BIGINT UNSIGNED NOT NULL,
@@ -275,6 +312,7 @@ CREATE TABLE IF NOT EXISTS `payments` (
         'created',
         'authorized',
         'captured',
+        'partially_refunded',
         'failed',
         'refunded'
     ) NOT NULL DEFAULT 'created',
@@ -305,24 +343,34 @@ CREATE TABLE IF NOT EXISTS `refunds` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `booking_id` BIGINT UNSIGNED NOT NULL,
     `payment_id` BIGINT UNSIGNED NOT NULL,
+    `refund_reference` VARCHAR(40) NULL,
     `provider_refund_id` VARCHAR(100) NULL,
+    `idempotency_key` VARCHAR(64) NULL,
     `amount` DECIMAL(12,2) NOT NULL,
+    `refund_percentage` TINYINT UNSIGNED NOT NULL DEFAULT 100,
+    `source` ENUM('customer', 'event') NOT NULL DEFAULT 'customer',
     `status` ENUM('pending', 'processing', 'processed', 'failed')
         NOT NULL DEFAULT 'pending',
     `reason` VARCHAR(1000) NOT NULL,
     `initiated_by` BIGINT UNSIGNED NULL,
+    `event_cancellation_request_id` BIGINT UNSIGNED NULL,
     `failure_description` VARCHAR(500) NULL,
+    `attempt_count` SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    `last_attempted_at` DATETIME(6) NULL,
     `requested_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `processed_at` DATETIME(6) NULL,
     `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
         ON UPDATE CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_refunds_reference` (`refund_reference`),
     UNIQUE KEY `uq_refunds_provider_refund` (`provider_refund_id`),
+    UNIQUE KEY `uq_refunds_idempotency` (`idempotency_key`),
     KEY `idx_refunds_booking_time` (`booking_id`, `requested_at`),
     KEY `idx_refunds_payment_status` (`payment_id`, `status`),
     KEY `idx_refunds_status_time` (`status`, `requested_at`),
     KEY `idx_refunds_initiated_by` (`initiated_by`),
+    KEY `idx_refunds_event_cancellation` (`event_cancellation_request_id`),
     CONSTRAINT `fk_refunds_booking`
         FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`)
         ON DELETE RESTRICT ON UPDATE RESTRICT,
@@ -334,6 +382,8 @@ CREATE TABLE IF NOT EXISTS `refunds` (
         ON DELETE SET NULL ON UPDATE RESTRICT,
     CONSTRAINT `chk_refunds_amount_positive`
         CHECK (`amount` > 0),
+    CONSTRAINT `chk_refunds_percentage`
+        CHECK (`refund_percentage` BETWEEN 1 AND 100),
     CONSTRAINT `chk_refunds_reason_not_blank`
         CHECK (CHAR_LENGTH(TRIM(`reason`)) > 0)
 ) ENGINE=InnoDB;
@@ -390,6 +440,81 @@ CREATE TABLE IF NOT EXISTS `event_cancellation_requests` (
         ON DELETE SET NULL ON UPDATE RESTRICT,
     CONSTRAINT `chk_cancellation_requests_reason_not_blank`
         CHECK (CHAR_LENGTH(TRIM(`reason`)) > 0)
+) ENGINE=InnoDB;
+
+ALTER TABLE `refunds`
+    ADD CONSTRAINT `fk_refunds_event_cancellation`
+        FOREIGN KEY (`event_cancellation_request_id`) REFERENCES `event_cancellation_requests` (`id`)
+        ON DELETE SET NULL ON UPDATE RESTRICT;
+
+CREATE TABLE IF NOT EXISTS `booking_cancellation_actions` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `request_token` CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    `booking_id` BIGINT UNSIGNED NOT NULL,
+    `customer_id` BIGINT UNSIGNED NOT NULL,
+    `refund_id` BIGINT UNSIGNED NULL,
+    `cancelled_quantity` SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    `refund_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    `refund_percentage` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    `refund_status` VARCHAR(20) NOT NULL DEFAULT 'not_required',
+    `status` ENUM('processing', 'completed') NOT NULL DEFAULT 'processing',
+    `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+        ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_booking_cancellation_actions_token` (`request_token`),
+    KEY `idx_booking_cancellation_actions_booking` (`booking_id`, `created_at`),
+    KEY `idx_booking_cancellation_actions_customer` (`customer_id`, `created_at`),
+    KEY `idx_booking_cancellation_actions_refund` (`refund_id`),
+    CONSTRAINT `fk_booking_cancellation_actions_booking`
+        FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`)
+        ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT `fk_booking_cancellation_actions_customer`
+        FOREIGN KEY (`customer_id`) REFERENCES `users` (`id`)
+        ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT `fk_booking_cancellation_actions_refund`
+        FOREIGN KEY (`refund_id`) REFERENCES `refunds` (`id`)
+        ON DELETE SET NULL ON UPDATE RESTRICT
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `ticket_cancellations` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `booking_id` BIGINT UNSIGNED NOT NULL,
+    `issued_ticket_id` BIGINT UNSIGNED NOT NULL,
+    `refund_id` BIGINT UNSIGNED NULL,
+    `event_cancellation_request_id` BIGINT UNSIGNED NULL,
+    `source` ENUM('customer', 'event') NOT NULL,
+    `cancelled_by` BIGINT UNSIGNED NULL,
+    `reason` VARCHAR(1000) NULL,
+    `gross_amount` DECIMAL(12,2) NOT NULL,
+    `refund_percentage` TINYINT UNSIGNED NOT NULL,
+    `refund_amount` DECIMAL(12,2) NOT NULL,
+    `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_ticket_cancellations_ticket` (`issued_ticket_id`),
+    KEY `idx_ticket_cancellations_booking_time` (`booking_id`, `created_at`),
+    KEY `idx_ticket_cancellations_refund` (`refund_id`),
+    KEY `idx_ticket_cancellations_event_request` (`event_cancellation_request_id`),
+    KEY `idx_ticket_cancellations_actor` (`cancelled_by`),
+    CONSTRAINT `fk_ticket_cancellations_booking`
+        FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`)
+        ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT `fk_ticket_cancellations_ticket`
+        FOREIGN KEY (`issued_ticket_id`) REFERENCES `issued_tickets` (`id`)
+        ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT `fk_ticket_cancellations_refund`
+        FOREIGN KEY (`refund_id`) REFERENCES `refunds` (`id`)
+        ON DELETE SET NULL ON UPDATE RESTRICT,
+    CONSTRAINT `fk_ticket_cancellations_event_request`
+        FOREIGN KEY (`event_cancellation_request_id`) REFERENCES `event_cancellation_requests` (`id`)
+        ON DELETE SET NULL ON UPDATE RESTRICT,
+    CONSTRAINT `fk_ticket_cancellations_actor`
+        FOREIGN KEY (`cancelled_by`) REFERENCES `users` (`id`)
+        ON DELETE SET NULL ON UPDATE RESTRICT,
+    CONSTRAINT `chk_ticket_cancellations_percentage`
+        CHECK (`refund_percentage` BETWEEN 0 AND 100),
+    CONSTRAINT `chk_ticket_cancellations_amounts`
+        CHECK (`gross_amount` >= 0 AND `refund_amount` >= 0 AND `refund_amount` <= `gross_amount`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `notifications` (

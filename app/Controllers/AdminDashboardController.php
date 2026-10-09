@@ -10,6 +10,7 @@ use App\Core\View;
 use App\Repositories\AdminDashboardRepository;
 use App\Repositories\OrganizerRepository;
 use App\Repositories\ManagementBookingRepository;
+use App\Repositories\CancellationRepository;
 
 final class AdminDashboardController
 {
@@ -23,6 +24,7 @@ final class AdminDashboardController
             'pendingOrganizers' => array_slice((new OrganizerRepository())->all('pending'), 0, 5),
             'bookingMetrics' => $bookings->adminMetrics(),
             'recentBookings' => $bookings->recentForAdmin(),
+            'refundMetrics' => (new CancellationRepository())->refundMetrics(),
             'success' => Session::consumeFlash('success'),
             'error' => Session::consumeFlash('error'),
         ]);

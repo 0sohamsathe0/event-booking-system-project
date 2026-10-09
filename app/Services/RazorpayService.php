@@ -10,10 +10,12 @@ use RuntimeException;
 class RazorpayService
 {
     private array $config;
+    private $transport;
 
-    public function __construct()
+    public function __construct(?callable $transport = null)
     {
         $this->config = (array) Config::get('payment.razorpay', []);
+        $this->transport = $transport;
     }
 
     public function isConfigured(): bool
@@ -45,6 +47,37 @@ class RazorpayService
         return $this->request('GET', '/payments/' . rawurlencode($paymentId));
     }
 
+    public function createRefund(
+        string $paymentId,
+        int $amountPaise,
+        string $receipt,
+        string $idempotencyKey
+    ): array {
+        if ($amountPaise < 100) {
+            throw new RuntimeException('A Razorpay refund must be at least INR 1.00.');
+        }
+        if (!str_starts_with($this->keyId(), 'rzp_test_')) {
+            throw new RuntimeException('This application only permits Razorpay Test Mode refunds.');
+        }
+
+        return $this->request(
+            'POST',
+            '/payments/' . rawurlencode($paymentId) . '/refund',
+            [
+                'amount' => $amountPaise,
+                'speed' => 'normal',
+                'receipt' => $receipt,
+                'notes' => ['refund_reference' => $receipt],
+            ],
+            ['X-Refund-Idempotency: ' . $idempotencyKey]
+        );
+    }
+
+    public function fetchRefundsForPayment(string $paymentId): array
+    {
+        return $this->request('GET', '/payments/' . rawurlencode($paymentId) . '/refunds?count=100');
+    }
+
     public function verifyPaymentSignature(string $orderId, string $paymentId, string $signature): bool
     {
         $expected = hash_hmac('sha256', $orderId . '|' . $paymentId, $this->keySecret());
@@ -56,10 +89,17 @@ class RazorpayService
         return trim((string) ($this->config['key_secret'] ?? ''));
     }
 
-    private function request(string $method, string $path, ?array $payload = null): array
+    private function request(string $method, string $path, ?array $payload = null, array $additionalHeaders = []): array
     {
         if (!$this->isConfigured()) {
             throw new RuntimeException('Razorpay test keys are not configured.');
+        }
+        if (is_callable($this->transport)) {
+            $result = ($this->transport)($method, $path, $payload, $additionalHeaders);
+            if (!is_array($result)) {
+                throw new RuntimeException('Razorpay transport returned an invalid response.');
+            }
+            return $result;
         }
         if (!function_exists('curl_init')) {
             throw new RuntimeException('The PHP cURL extension is required for Razorpay.');
@@ -72,7 +112,10 @@ class RazorpayService
             CURLOPT_CONNECTTIMEOUT => 8,
             CURLOPT_HTTPAUTH => CURLAUTH_BASIC,
             CURLOPT_USERPWD => $this->keyId() . ':' . $this->keySecret(),
-            CURLOPT_HTTPHEADER => ['Accept: application/json', 'Content-Type: application/json'],
+            CURLOPT_HTTPHEADER => array_merge(
+                ['Accept: application/json', 'Content-Type: application/json'],
+                $additionalHeaders
+            ),
         ];
         if ($method === 'POST') {
             $options[CURLOPT_POST] = true;

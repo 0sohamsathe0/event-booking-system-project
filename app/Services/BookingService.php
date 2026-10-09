@@ -178,6 +178,7 @@ final class BookingService
         try {
             $booking = $this->lockBooking($bookingId, $customerId);
             if ($booking['status'] === 'confirmed') {
+                (new TicketIssuanceService())->issueForConfirmedBooking($bookingId);
                 $database->commit();
                 return;
             }
@@ -325,10 +326,15 @@ final class BookingService
                 throw new DomainException('Ticket inventory could not be finalized.');
             }
         }
-        $database->prepare(
+        $confirm = $database->prepare(
             "UPDATE bookings SET status = 'confirmed', confirmed_at = UTC_TIMESTAMP(6),
                     reservation_expires_at = NULL WHERE id = :id AND status = 'pending_payment'"
-        )->execute(['id' => $bookingId]);
+        );
+        $confirm->execute(['id' => $bookingId]);
+        if ($confirm->rowCount() !== 1) {
+            throw new DomainException('The booking could not be confirmed safely.');
+        }
+        (new TicketIssuanceService())->issueForConfirmedBooking($bookingId);
         (new NotificationRepository())->createForUser(
             $customerId, 'booking_confirmed', 'Booking confirmed',
             'Your booking has been confirmed successfully.',

@@ -19,6 +19,7 @@ final class Session
         }
 
         self::$config = $config;
+        ini_set('session.lazy_write', '1');
         if (($config['driver'] ?? 'file') === 'database') {
             session_set_save_handler(new DatabaseSessionHandler((int) $config['lifetime']), true);
         } else {

@@ -14,6 +14,16 @@
             <article class="stat-card"><span>Pending events</span><strong><?= e($counts['pending_events']) ?></strong></article>
         </div>
 
+        <div class="panel-heading"><div><span class="eyebrow">Cancellation operations</span><h2>Refund status</h2></div><div class="hero-actions"><a href="<?= e(url('admin/cancellations')) ?>">Review cancellations</a><a href="<?= e(url('admin/refunds')) ?>">Manage refunds</a></div></div>
+        <div class="stat-grid">
+            <article class="stat-card"><span>All refunds</span><strong><?= e($refundMetrics['total_refunds']) ?></strong></article>
+            <article class="stat-card"><span>Pending</span><strong><?= e($refundMetrics['pending_refunds']) ?></strong></article>
+            <article class="stat-card"><span>Failed / retry</span><strong><?= e($refundMetrics['failed_refunds']) ?></strong></article>
+            <article class="stat-card"><span>Refunded</span><strong><?= e(money($refundMetrics['refunded_amount'])) ?></strong></article>
+            <article class="stat-card"><span>Cancelled tickets</span><strong><?= e($refundMetrics['cancelled_tickets']) ?></strong></article>
+            <article class="stat-card"><span>Cancellation requests</span><strong><?= e($refundMetrics['pending_cancellation_requests']) ?></strong></article>
+        </div>
+
         <div class="panel-heading"><div><span class="eyebrow">Commercial overview</span><h2>Bookings and revenue</h2></div><div class="hero-actions"><a href="<?= e(url('admin/customers')) ?>">Customers</a><a href="<?= e(url('admin/bookings')) ?>">All bookings</a></div></div>
         <div class="stat-grid">
             <article class="stat-card"><span>All / confirmed bookings</span><strong><?= e($bookingMetrics['total_bookings']) ?> / <?= e($bookingMetrics['confirmed_bookings']) ?></strong></article>

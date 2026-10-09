@@ -70,11 +70,24 @@ LOG_CHANNEL=stderr
 ```
 
 `DB_SSL_MODE` accepts `disabled`, `preferred`, `required`, `verify_ca`, or
-`verify_identity`. Production providers should use at least `required`. For
-verified modes, place the provider's public CA certificate in a non-public
-repository path and set `DB_SSL_CA` to that readable path. CA certificates are
-not passwords, but confirm the provider's rotation procedure before tracking
-one. Do not disable provider-required TLS.
+`verify_identity`. Production providers should use at least `required`.
+`DB_SSL_CA` may contain the provider's complete PEM certificate or a readable
+certificate path. Raw PEM values are materialized into temporary runtime
+storage and are never logged. Prefer `verify_ca` or `verify_identity` when the
+provider supplies a CA certificate. Verified modes avoid a separate runtime
+TLS-status query because a failed certificate-verified handshake already
+closes the connection. Do not disable provider-required TLS.
+
+The ignored local `.env` file is loaded for web requests. Existing process or
+Vercel environment variables always take precedence. CLI tools skip `.env` by
+default so database tests cannot accidentally mutate a cloud database; the
+external-service verifier explicitly opts in.
+
+For local browser testing against the external database, start the application
+with `scripts/start_local_server.ps1`. It overrides only the local runtime mode,
+URL, logging, and session driver, allowing file sessions to avoid two remote
+session round trips per request. This optimization is local-only; Preview and
+Production must retain database sessions.
 
 Production validation rejects incomplete database, Razorpay, session,
 Cloudinary, URL, or driver configuration. It also rejects a Razorpay key ID
@@ -104,6 +117,29 @@ PDO connection:
 ```powershell
 C:\xampp\php\php.exe scripts\apply_phase_14_upgrade.php
 ```
+
+Existing Phase 14 databases must also receive the additive ticket issuance
+table before deploying this application version:
+
+```text
+database/phase_15_ticket_issuance.sql
+```
+
+or through the configured PDO connection:
+
+```powershell
+C:\xampp\php\php.exe scripts\apply_phase_15_ticket_issuance.php
+```
+
+After the table exists, issue tickets for confirmed bookings created before the
+upgrade:
+
+```powershell
+C:\xampp\php\php.exe scripts\backfill_issued_tickets.php
+```
+
+The backfill is idempotent and processes bookings by event and confirmation
+time. Run it once against each upgraded database.
 
 The migration does not delete or rewrite users, events, tickets, bookings,
 payments, inventory, webhook history, or existing poster paths.
@@ -135,6 +171,17 @@ to work.
 Rotate Cloudinary credentials in its console, update Preview/Production
 variables, and redeploy. Old deployments keep their previous environment
 values, so remove them when rotation is complete.
+
+Before Vercel deployment, the configured external database and Cloudinary
+account can be checked without exposing credentials:
+
+```powershell
+C:\xampp\php\php.exe scripts\verify_external_services.php
+```
+
+This performs read-only schema checks, writes and destroys one temporary
+database session, and uploads then deletes one temporary Cloudinary asset. It
+does not create a Razorpay order.
 
 ## Vercel deployment
 
@@ -175,6 +222,8 @@ external-network access, provider TLS, and cold starts require a real Preview.
 7. Inspect the booking, payment, inventory, and notification records.
 8. Replay the same webhook event and confirm the booking is not confirmed or
    sold twice.
+9. Confirm one `issued_tickets` row exists per booked quantity, with unique
+   ticket codes and unique event-wide seat numbers.
 
 Rotate Razorpay credentials in Test Mode, update Vercel variables, redeploy,
 test a new order, and then retire the previous keys. Live Mode is outside Phase
@@ -201,6 +250,7 @@ test a new order, and then retire the previous keys. Live Mode is outside Phase
 - [ ] 17. Razorpay callback succeeds.
 - [ ] 18. Razorpay signed webhook succeeds.
 - [ ] 19. Booking and inventory confirm exactly once.
+- [ ] 19a. Confirmed quantity produces the same number of unique tickets/seats.
 - [ ] 20. Organizer sees only bookings for owned events.
 - [ ] 21. Admin sees the correct booking and payment state.
 - [ ] 22. Logout invalidates the database session.
@@ -226,7 +276,30 @@ Do not promote to Production until all 25 checks pass.
 - **Poster upload fails:** verify cURL/fileinfo support, Cloudinary variables,
   folder syntax, file format, and the 5 MB limit.
 - **Webhook is rejected:** verify the exact raw-body webhook secret, public URL,
-  `payment.captured` subscription, and Razorpay Test Mode.
+  `payment.captured`, `refund.created`, `refund.processed`, and `refund.failed`
+  subscriptions, and Razorpay Test Mode.
+
+## Phase 16 cancellation/refund deployment
+
+Before deploying Phase 16, back up the external database and import
+`database/phase_16_cancellations_refunds.sql` after the Phase 15 upgrade. The
+migration preserves historical tickets and replaces permanent seat uniqueness
+with active-seat uniqueness so cancelled seats can be assigned again safely.
+
+Keep the Razorpay dashboard in **Test Mode** and add these events to the existing
+signed webhook endpoint:
+
+```text
+payment.captured
+refund.created
+refund.processed
+refund.failed
+```
+
+The application refuses refund calls unless `RAZORPAY_KEY_ID` starts with
+`rzp_test_`. After deployment, test one 100% partial refund, one 50% partial
+refund, a failed/retried refund, and an approved event cancellation. Confirm
+that duplicate webhook delivery changes neither refund totals nor inventory.
 
 ## Rollback
 

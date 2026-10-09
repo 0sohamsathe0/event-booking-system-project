@@ -70,7 +70,10 @@ final class Database
             );
 
             self::$connection->exec("SET time_zone = '+00:00'");
-            if (in_array($sslMode, ['required', 'verify_ca', 'verify_identity'], true)) {
+            // Certificate-verified modes already fail during the PDO handshake
+            // when TLS cannot be established. Only `required` needs the extra
+            // runtime check because certificate verification is disabled there.
+            if ($sslMode === 'required') {
                 $status = self::$connection->query("SHOW STATUS LIKE 'Ssl_cipher'")->fetch();
                 if (!is_array($status) || trim((string) ($status['Value'] ?? '')) === '') {
                     self::$connection = null;

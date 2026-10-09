@@ -9,7 +9,9 @@ use App\Core\Auth;
 use App\Core\Authorization;
 use App\Core\View;
 use App\Repositories\ManagementBookingRepository;
+use App\Repositories\IssuedTicketRepository;
 use App\Repositories\EventRepository;
+use App\Repositories\CancellationRepository;
 
 final class OrganizerBookingController
 {
@@ -64,6 +66,8 @@ final class OrganizerBookingController
             'pageTitle' => 'Booking ' . $booking['booking_reference'],
             'booking' => $booking,
             'items' => $repository->items($id),
+            'issuedTickets' => (new IssuedTicketRepository())->forBooking($id),
+            'refunds' => (new CancellationRepository())->refundsForBooking($id),
         ]);
     }
 }
