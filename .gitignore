@@ -10,3 +10,10 @@
 .env.*
 !.env.example
 /.vercel/
+
+# Local project planning and personal verification notes
+/PROJECT_CONTEXT.md
+/TWO_DAY_SUBMISSION_PLAN.md
+/PHASE_14_VERCEL_COMPATIBILITY_PLAN.txt
+/docs/MANUAL_END_TO_END_TEST.md
+/docs/VERCEL_DEPLOYMENT_PLAN.md
