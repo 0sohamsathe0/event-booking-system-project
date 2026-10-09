@@ -154,6 +154,10 @@ active attendee navigation, and customer/role isolation coverage.
 Follow [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the external database,
 Cloudinary, Vercel, environment-variable, Razorpay webhook, Preview validation,
 and rollback procedures. No production deployment is performed automatically.
+Production health diagnostics remain disabled by default. During a failed
+deployment, `APP_SAFE_DIAGNOSTICS=true` may be enabled temporarily so
+`/health` returns only a non-sensitive failure category. Disable it again after
+diagnosis and never enable public PHP debug output.
 
 ## Phase 16 database upgrade
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Core\Router;
 use App\Core\Logger;
+use App\Core\SafeDiagnostics;
 use App\Core\SecurityHeaders;
 
 // When this file is used as PHP's built-in development-server router,
@@ -40,7 +41,9 @@ try {
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         header('Cache-Control: no-store');
-        echo 'unavailable';
+        echo class_exists(SafeDiagnostics::class)
+            ? SafeDiagnostics::unavailable($exception)
+            : 'unavailable';
         return;
     }
 

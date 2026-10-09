@@ -39,6 +39,7 @@ Required production variables:
 ```text
 APP_ENV=production
 APP_DEBUG=false
+APP_SAFE_DIAGNOSTICS=false
 APP_URL=https://your-preview-or-production-domain
 APP_BASE_PATH=
 APP_TIMEZONE=Asia/Kolkata
@@ -68,6 +69,13 @@ POSTER_STORAGE_DRIVER=cloudinary
 
 LOG_CHANNEL=stderr
 ```
+
+If `/health` returns `unavailable`, temporarily set
+`APP_SAFE_DIAGNOSTICS=true` and redeploy. The endpoint will return only a safe
+category such as `database_connection_failed`, `database_tls_failed`, or
+`configuration_incomplete`. It never returns exception messages, SQL, hosts,
+paths, stack traces, or credentials. Restore the value to `false` immediately
+after diagnosis. Do not use `APP_DEBUG=true` on a public deployment.
 
 `DB_SSL_MODE` accepts `disabled`, `preferred`, `required`, `verify_ca`, or
 `verify_identity`. Production providers should use at least `required`.
