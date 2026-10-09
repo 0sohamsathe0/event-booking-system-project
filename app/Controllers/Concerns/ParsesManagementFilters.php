@@ -18,8 +18,8 @@ trait ParsesManagementFilters
             $errors[] = 'Search text was limited to 100 characters.';
         }
 
-        $statuses = ['any', 'pending_payment', 'confirmed', 'payment_failed', 'expired', 'customer_cancelled', 'event_cancelled'];
-        $paymentStatuses = ['any', 'not_required', 'not_started', 'created', 'authorized', 'captured', 'failed', 'refunded'];
+        $statuses = ['any', 'pending_payment', 'confirmed', 'partially_cancelled', 'payment_failed', 'expired', 'customer_cancelled', 'event_cancelled'];
+        $paymentStatuses = ['any', 'not_required', 'not_started', 'created', 'authorized', 'captured', 'partially_refunded', 'failed', 'refunded'];
         $sorts = ['newest', 'oldest', 'event_soonest', 'amount_high', 'amount_low'];
         $status = $this->allowedQuery('status', $statuses, 'any', $errors, 'The booking status filter was reset.');
         $paymentStatus = $this->allowedQuery('payment_status', $paymentStatuses, 'any', $errors, 'The payment status filter was reset.');

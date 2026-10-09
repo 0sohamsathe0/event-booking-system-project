@@ -8,6 +8,8 @@ use App\Controllers\Concerns\ParsesManagementFilters;
 use App\Core\Authorization;
 use App\Core\View;
 use App\Repositories\ManagementBookingRepository;
+use App\Repositories\IssuedTicketRepository;
+use App\Repositories\CancellationRepository;
 
 final class AdminBookingController
 {
@@ -50,6 +52,8 @@ final class AdminBookingController
             'pageTitle' => 'Booking ' . $booking['booking_reference'],
             'booking' => $booking,
             'items' => $repository->items($id),
+            'issuedTickets' => (new IssuedTicketRepository())->forBooking($id),
+            'refunds' => (new CancellationRepository())->refundsForBooking($id),
         ]);
     }
 }

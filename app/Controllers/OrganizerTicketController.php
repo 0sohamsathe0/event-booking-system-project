@@ -8,6 +8,7 @@ use App\Core\Authorization;
 use App\Core\Csrf;
 use App\Core\Session;
 use App\Core\View;
+use App\Core\Logger;
 use App\Repositories\EventRepository;
 use App\Repositories\TicketTypeRepository;
 use App\Services\TicketTypeService;
@@ -129,7 +130,10 @@ final class OrganizerTicketController
             return;
         }
 
-        error_log($exception->__toString());
+        Logger::error('ticket.request_failed', [
+            'exception' => $exception,
+            'organizer_id' => Auth::id(),
+        ]);
         Session::flash('error', 'The ticket change could not be saved. Please check the values and try again.');
     }
 }

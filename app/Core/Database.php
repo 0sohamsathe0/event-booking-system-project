@@ -41,19 +41,45 @@ final class Database
         );
 
         try {
+            $options = [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::ATTR_STRINGIFY_FETCHES => false,
+                PDO::ATTR_PERSISTENT => false,
+            ];
+            $sslMode = strtolower((string) (self::$config['ssl_mode'] ?? 'disabled'));
+            $sslCa = trim((string) (self::$config['ssl_ca'] ?? ''));
+            if ($sslMode !== 'disabled') {
+                $options[PDO::MYSQL_ATTR_SSL_CIPHER] = 'DEFAULT';
+                if ($sslCa !== '') {
+                    $options[PDO::MYSQL_ATTR_SSL_CA] = $sslCa;
+                }
+                $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = in_array(
+                    $sslMode,
+                    ['verify_ca', 'verify_identity'],
+                    true
+                );
+            }
+
             self::$connection = new PDO(
                 $dsn,
                 self::$config['username'],
                 self::$config['password'],
-                [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES => false,
-                    PDO::ATTR_STRINGIFY_FETCHES => false,
-                ]
+                $options
             );
 
             self::$connection->exec("SET time_zone = '+00:00'");
+            // Certificate-verified modes already fail during the PDO handshake
+            // when TLS cannot be established. Only `required` needs the extra
+            // runtime check because certificate verification is disabled there.
+            if ($sslMode === 'required') {
+                $status = self::$connection->query("SHOW STATUS LIKE 'Ssl_cipher'")->fetch();
+                if (!is_array($status) || trim((string) ($status['Value'] ?? '')) === '') {
+                    self::$connection = null;
+                    throw new RuntimeException('The database did not establish the required encrypted connection.');
+                }
+            }
         } catch (PDOException $exception) {
             throw new RuntimeException('Unable to connect to the database.', 0, $exception);
         }
@@ -61,4 +87,3 @@ final class Database
         return self::$connection;
     }
 }
-

@@ -47,7 +47,8 @@
             <p>Approved events will appear here with ticket prices and live availability.</p>
         </div><?php else: ?><div class="public-event-grid public-event-grid-featured">
             <?php foreach (array_slice($events, 0, 3) as $event): ?><article class="public-event-card">
-                <a class="event-image" href="<?= e(url('events/' . $event['id'])) ?>"><?php if ($event['poster_path']): ?><img src="<?= e(url($event['poster_path'])) ?>" alt="<?= e($event['title']) ?> poster"><?php else: ?><span>No poster</span><?php endif; ?></a>
+                <?php $posterUrl = poster_url($event['poster_path']); ?>
+                <a class="event-image" href="<?= e(url('events/' . $event['id'])) ?>"><?php if ($posterUrl): ?><img src="<?= e($posterUrl) ?>" alt="<?= e($event['title']) ?> poster"><?php else: ?><span>No poster</span><?php endif; ?></a>
                 <div class="public-event-copy"><span class="event-meta"><?= e(local_datetime($event['start_datetime'], 'd M Y')) ?> / <?= e($event['category_name']) ?></span><h3><a href="<?= e(url('events/' . $event['id'])) ?>"><?= e($event['title']) ?></a></h3><div class="event-card-footer"><strong>From <?= e(money($event['starting_price'])) ?></strong><span><?= e($event['available_quantity']) ?> available</span></div></div>
             </article><?php endforeach; ?>
         </div><?php endif; ?>

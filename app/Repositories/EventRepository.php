@@ -14,12 +14,12 @@ final class EventRepository
             "SELECT e.id, e.title, e.start_datetime, e.end_datetime,
                     e.event_capacity, e.status, e.poster_path, e.updated_at,
                     c.name AS category_name, h.name AS hall_name,
-                    (SELECT COUNT(*) FROM bookings b WHERE b.event_id = e.id AND b.status = 'confirmed') AS confirmed_bookings,
-                    (SELECT COALESCE(SUM(b.total_quantity), 0) FROM bookings b WHERE b.event_id = e.id AND b.status = 'confirmed') AS confirmed_tickets,
-                    (SELECT COALESCE(SUM(CASE WHEN b.total_amount = 0 OR EXISTS (
-                        SELECT 1 FROM payments p WHERE p.booking_id = b.id AND p.status = 'captured'
-                    ) THEN b.total_amount ELSE 0 END), 0)
-                     FROM bookings b WHERE b.event_id = e.id AND b.status = 'confirmed') AS confirmed_revenue,
+                    (SELECT COUNT(*) FROM bookings b WHERE b.event_id = e.id AND b.status IN ('confirmed', 'partially_cancelled')) AS confirmed_bookings,
+                    (SELECT COUNT(*) FROM issued_tickets it WHERE it.event_id = e.id AND it.status = 'valid') AS confirmed_tickets,
+                    (SELECT COALESCE(SUM(p.amount - COALESCE((
+                        SELECT SUM(r.amount) FROM refunds r WHERE r.payment_id = p.id AND r.status = 'processed'
+                    ), 0)), 0) FROM payments p JOIN bookings b ON b.id = p.booking_id
+                     WHERE b.event_id = e.id AND p.status IN ('captured', 'partially_refunded', 'refunded')) AS confirmed_revenue,
                     (SELECT esh.reason FROM event_status_history esh
                      WHERE esh.event_id = e.id AND esh.new_status = 'rejected'
                      ORDER BY esh.created_at DESC, esh.id DESC LIMIT 1) AS rejection_reason
@@ -50,10 +50,12 @@ final class EventRepository
         $statement = Database::connection()->prepare(
             "INSERT INTO events
                 (organizer_id, hall_id, category_id, title, description, poster_path,
+                 poster_provider, poster_public_id,
                  start_datetime, end_datetime, sale_start_datetime,
                  sale_end_datetime, event_capacity, status)
              VALUES
                 (:organizer_id, :hall_id, :category_id, :title, :description, :poster_path,
+                 :poster_provider, :poster_public_id,
                  :start_datetime, :end_datetime, :sale_start_datetime,
                  :sale_end_datetime, :event_capacity, 'pending')"
         );
@@ -70,6 +72,7 @@ final class EventRepository
             'UPDATE events SET
                 hall_id = :hall_id, category_id = :category_id, title = :title,
                 description = :description, poster_path = :poster_path,
+                poster_provider = :poster_provider, poster_public_id = :poster_public_id,
                 start_datetime = :start_datetime, end_datetime = :end_datetime,
                 sale_start_datetime = :sale_start_datetime,
                 sale_end_datetime = :sale_end_datetime,

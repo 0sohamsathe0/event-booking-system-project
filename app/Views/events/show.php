@@ -2,7 +2,8 @@
 <section class="section event-detail"><div class="container">
     <a class="back-link" href="<?= e(url('events')) ?>">&larr; All events</a>
     <div class="event-detail-grid">
-        <div class="event-detail-poster"><?php if ($event['poster_path']): ?><img src="<?= e(url($event['poster_path'])) ?>" alt="<?= e($event['title']) ?> poster"><?php else: ?><span>No poster available</span><?php endif; ?></div>
+        <?php $posterUrl = poster_url($event['poster_path']); ?>
+        <div class="event-detail-poster"><?php if ($posterUrl): ?><img src="<?= e($posterUrl) ?>" alt="<?= e($event['title']) ?> poster"><?php else: ?><span>No poster available</span><?php endif; ?></div>
         <div class="event-detail-copy">
             <span class="eyebrow"><?= e($event['category_name']) ?></span>
             <h1><?= e($event['title']) ?></h1>

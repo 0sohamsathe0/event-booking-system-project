@@ -36,10 +36,9 @@ $value = static fn(string $key, mixed $default = ''): string => e($old[$key] ?? 
             </div></fieldset>
 
             <div class="form-group"><label for="poster">Event poster</label><input id="poster" name="poster" type="file" accept="image/jpeg,image/png,image/webp"><small class="muted">Optional JPEG, PNG, or WebP; maximum 5 MB.</small><?php if (isset($errors['poster'])): ?><p class="field-error"><?= e($errors['poster']) ?></p><?php endif; ?></div>
-            <?php if ($isEdit && $event['poster_path']): ?><div class="current-poster"><img src="<?= e(url($event['poster_path'])) ?>" alt="Current poster"><label><input type="checkbox" name="remove_poster" value="1"> Remove current poster</label></div><?php endif; ?>
+            <?php $posterUrl = $isEdit ? poster_url($event['poster_path']) : null; if ($posterUrl): ?><div class="current-poster"><img src="<?= e($posterUrl) ?>" alt="Current poster"><label><input type="checkbox" name="remove_poster" value="1"> Remove current poster</label></div><?php endif; ?>
 
             <button class="button button-full" type="submit" <?= $hall === null ? 'disabled' : '' ?>><?= $isEdit ? 'Save and submit for review' : 'Submit event for review' ?></button>
         </form>
     </div>
 </section>
-

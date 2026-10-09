@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Core\Database;
 use App\Repositories\BookingRepository;
+use App\Repositories\IssuedTicketRepository;
 use App\Services\BookingService;
 use App\Services\RazorpayService;
 
@@ -126,9 +127,11 @@ try {
         public function fetchPayment(string $paymentId): array
         {
             $payment = Database::connection()->prepare(
-                'SELECT provider_order_id, amount FROM payments WHERE provider_payment_id IS NULL ORDER BY id DESC LIMIT 1'
+                'SELECT provider_order_id, amount FROM payments
+                 WHERE provider_payment_id = :payment_id OR provider_payment_id IS NULL
+                 ORDER BY provider_payment_id IS NOT NULL DESC, id DESC LIMIT 1'
             );
-            $payment->execute();
+            $payment->execute(['payment_id' => $paymentId]);
             $record = $payment->fetch();
             return [
                 'order_id' => $record['provider_order_id'],
@@ -204,10 +207,38 @@ try {
     $confirmedPaid = (new BookingRepository())->findForCustomer($paid['booking_id'], $customerOneId);
     assertBookingService($confirmedPaid['status'] === 'confirmed', 'Captured paid booking was not confirmed.');
     assertBookingService($confirmedPaid['payment_status'] === 'captured', 'Captured payment status was not stored.');
+    $issuedRepository = new IssuedTicketRepository();
+    $paidTickets = $issuedRepository->forCustomerBooking($paid['booking_id'], $customerOneId);
+    assertBookingService(count($paidTickets) === 2, 'Paid booking did not issue one ticket per quantity.');
+    assertBookingService(
+        array_column($paidTickets, 'seat_number') === [1, 2],
+        'Paid booking seats were not allocated sequentially.'
+    );
+    assertBookingService(
+        count(array_unique(array_column($paidTickets, 'ticket_code'))) === 2,
+        'Paid tickets did not receive unique ticket codes.'
+    );
+    $service->confirm(
+        $paid['booking_id'],
+        $customerOneId,
+        (string) $paidBooking['provider_order_id'],
+        'pay_regression_success',
+        'valid-signature'
+    );
+    assertBookingService(
+        count($issuedRepository->forCustomerBooking($paid['booking_id'], $customerOneId)) === 2,
+        'Repeated payment confirmation created duplicate tickets.'
+    );
 
     $free = $service->reserve($customerOneId, $created['event'], [$ticketIds['Community'] => 2]);
     $freeBooking = (new BookingRepository())->findForCustomer($free['booking_id'], $customerOneId);
     assertBookingService($free['free'] === true && $freeBooking['status'] === 'confirmed', 'Free booking was not confirmed.');
+    $freeTickets = $issuedRepository->forCustomerBooking($free['booking_id'], $customerOneId);
+    assertBookingService(count($freeTickets) === 2, 'Free booking did not issue tickets.');
+    assertBookingService(
+        array_column($freeTickets, 'seat_number') === [3, 4],
+        'Free booking did not continue event-wide seat allocation.'
+    );
 
     expectBookingDomainException(
         static fn () => $service->reserve($customerTwoId, $created['event'], [$ticketIds['Community'] => 4]),
@@ -270,6 +301,7 @@ try {
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
             $database->prepare("DELETE FROM notifications WHERE booking_id IN ($placeholders)")->execute($ids);
             $database->prepare("DELETE FROM payments WHERE booking_id IN ($placeholders)")->execute($ids);
+            $database->prepare("DELETE FROM issued_tickets WHERE booking_id IN ($placeholders)")->execute($ids);
             $database->prepare("DELETE FROM booking_items WHERE booking_id IN ($placeholders)")->execute($ids);
             $database->prepare("DELETE FROM bookings WHERE id IN ($placeholders)")->execute($ids);
         }

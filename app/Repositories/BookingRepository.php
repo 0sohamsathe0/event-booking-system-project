@@ -172,7 +172,7 @@ final class BookingRepository
              JOIN events e ON e.id = b.event_id
              JOIN halls h ON h.id = e.hall_id
              WHERE b.customer_id = :customer_id
-               AND b.status = 'confirmed'
+               AND b.status IN ('confirmed', 'partially_cancelled')
                AND e.start_datetime >= UTC_TIMESTAMP(6)
              ORDER BY e.start_datetime, b.id
              LIMIT " . $this->safeLimit($limit)

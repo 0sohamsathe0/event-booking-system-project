@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Core\Database;
+use App\Core\Config;
 use App\Repositories\NotificationRepository;
 use DomainException;
 use PDOException;
@@ -17,9 +18,7 @@ final class PaymentWebhookService
 
     public function __construct()
     {
-        $file = is_file(BASE_PATH . '/config/payment.local.php')
-            ? BASE_PATH . '/config/payment.local.php' : BASE_PATH . '/config/payment.php';
-        $this->config = (require $file)['razorpay'];
+        $this->config = (array) Config::get('payment.razorpay', []);
     }
 
     public function process(string $rawBody, string $signature, string $providerEventId): string
@@ -59,6 +58,17 @@ final class PaymentWebhookService
             }
             $webhookId = (int) $database->lastInsertId();
 
+            if (in_array($type, ['refund.created', 'refund.processed', 'refund.failed'], true)) {
+                $refundEntity = $payload['payload']['refund']['entity'] ?? null;
+                if (!is_array($refundEntity)) {
+                    throw new DomainException('Refund webhook data is missing.');
+                }
+                (new RefundService())->applyWebhookEntity($refundEntity, $type);
+                $this->mark($webhookId, 'processed');
+                $database->commit();
+                return 'processed';
+            }
+
             if ($type !== 'payment.captured') {
                 $this->mark($webhookId, 'ignored');
                 $database->commit();
@@ -72,7 +82,7 @@ final class PaymentWebhookService
             $orderId = (string) ($paymentEntity['order_id'] ?? '');
             $paymentId = (string) ($paymentEntity['id'] ?? '');
             $statement = $database->prepare(
-                'SELECT p.id AS payment_record_id, p.booking_id, p.amount, p.currency
+                'SELECT p.id AS payment_record_id, p.booking_id, p.amount, p.currency, p.status
                  FROM payments p WHERE p.provider_order_id = :order_id LIMIT 1'
             );
             $statement->execute(['order_id' => $orderId]);
@@ -93,6 +103,13 @@ final class PaymentWebhookService
                 throw new DomainException('Webhook payment details do not match the booking.');
             }
             if ($booking['status'] === 'confirmed') {
+                (new TicketIssuanceService())->issueForConfirmedBooking((int) $booking['id']);
+                $this->mark($webhookId, 'processed');
+                $database->commit();
+                return 'processed';
+            }
+            if (in_array($booking['status'], ['partially_cancelled', 'customer_cancelled', 'event_cancelled'], true)
+                && in_array($paymentRecord['status'], ['captured', 'partially_refunded', 'refunded'], true)) {
                 $this->mark($webhookId, 'processed');
                 $database->commit();
                 return 'processed';
@@ -129,10 +146,15 @@ final class PaymentWebhookService
                     throw new DomainException('Reserved ticket inventory is unavailable.');
                 }
             }
-            $database->prepare(
+            $confirm = $database->prepare(
                 "UPDATE bookings SET status = 'confirmed', confirmed_at = UTC_TIMESTAMP(6),
                         reservation_expires_at = NULL WHERE id = :id AND status = 'pending_payment'"
-            )->execute(['id' => $booking['id']]);
+            );
+            $confirm->execute(['id' => $booking['id']]);
+            if ($confirm->rowCount() !== 1) {
+                throw new DomainException('The booking could not be confirmed safely.');
+            }
+            (new TicketIssuanceService())->issueForConfirmedBooking((int) $booking['id']);
             $database->prepare(
                 "UPDATE payments SET provider_payment_id = :provider_payment_id, status = 'captured',
                         signature_verified_at = UTC_TIMESTAMP(6), captured_at = UTC_TIMESTAMP(6)

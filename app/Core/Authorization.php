@@ -22,7 +22,7 @@ final class Authorization
         if (!Auth::check() || !Auth::refresh()) {
             if (Auth::check()) {
                 Auth::logout();
-                Session::start((require BASE_PATH . '/config/app.php')['session']);
+                Session::restart();
             }
 
             Session::flash('error', 'Please log in to continue.');

@@ -16,13 +16,15 @@ use Throwable;
 final class EventService
 {
     private const LOCAL_TIMEZONE = 'Asia/Kolkata';
+    private readonly PosterStorageManager $posters;
 
     public function __construct(
         private readonly EventRepository $events = new EventRepository(),
         private readonly EventCatalogRepository $catalog = new EventCatalogRepository(),
         private readonly NotificationRepository $notifications = new NotificationRepository(),
-        private readonly PosterUploader $posters = new PosterUploader()
+        ?PosterStorageManager $posters = null
     ) {
+        $this->posters = $posters ?? new PosterStorageManager();
     }
 
     public function validate(array $input): array
@@ -110,7 +112,7 @@ final class EventService
             if ($database->inTransaction()) {
                 $database->rollBack();
             }
-            $this->posters->delete($newPoster);
+            $this->posters->deleteSafely($newPoster);
             throw $exception;
         }
     }
@@ -131,13 +133,13 @@ final class EventService
                 throw new DomainException('A cancelled event cannot be edited.');
             }
 
-            $posterPath = $event['poster_path'];
+            $posterAsset = PosterAsset::fromEvent($event);
             if ($newPoster !== null) {
-                $oldPosterToDelete = $posterPath;
-                $posterPath = $newPoster;
+                $oldPosterToDelete = $posterAsset;
+                $posterAsset = $newPoster;
             } elseif ($removePoster) {
-                $oldPosterToDelete = $posterPath;
-                $posterPath = null;
+                $oldPosterToDelete = $posterAsset;
+                $posterAsset = null;
             }
 
             $oldStatus = $event['status'];
@@ -145,7 +147,7 @@ final class EventService
             $this->events->update(
                 $eventId,
                 $organizerId,
-                $this->persistenceData($organizerId, $data, $posterPath),
+                $this->persistenceData($organizerId, $data, $posterAsset),
                 $newStatus
             );
 
@@ -163,14 +165,15 @@ final class EventService
             }
 
             $database->commit();
-            $this->posters->delete($oldPosterToDelete);
         } catch (Throwable $exception) {
             if ($database->inTransaction()) {
                 $database->rollBack();
             }
-            $this->posters->delete($newPoster);
+            $this->posters->deleteSafely($newPoster);
             throw $exception;
         }
+
+        $this->posters->deleteSafely($oldPosterToDelete);
     }
 
     public function localFormData(array $event): array
@@ -193,7 +196,7 @@ final class EventService
         return $date;
     }
 
-    private function persistenceData(int $organizerId, array $data, ?string $posterPath): array
+    private function persistenceData(int $organizerId, array $data, ?PosterAsset $poster): array
     {
         return [
             'organizer_id' => $organizerId,
@@ -201,7 +204,9 @@ final class EventService
             'category_id' => $data['category_id'],
             'title' => $data['title'],
             'description' => $data['description'],
-            'poster_path' => $posterPath,
+            'poster_path' => $poster?->path,
+            'poster_provider' => $poster?->provider,
+            'poster_public_id' => $poster?->publicId,
             'start_datetime' => $data['start_datetime'],
             'end_datetime' => $data['end_datetime'],
             'sale_start_datetime' => $data['sale_start_datetime'],

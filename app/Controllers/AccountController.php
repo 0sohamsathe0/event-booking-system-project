@@ -11,6 +11,7 @@ use App\Core\View;
 use App\Repositories\BookingRepository;
 use App\Repositories\NotificationRepository;
 use App\Repositories\ManagementBookingRepository;
+use App\Repositories\CancellationRepository;
 
 final class AccountController
 {
@@ -46,6 +47,7 @@ final class AccountController
                 'user' => $user,
                 'metrics' => $bookings->organizerMetrics($organizerId),
                 'recentBookings' => $bookings->recentForOrganizer($organizerId),
+                'refundMetrics' => (new CancellationRepository())->refundMetrics($organizerId),
                 'success' => Session::consumeFlash('success'),
                 'error' => Session::consumeFlash('error'),
             ]);

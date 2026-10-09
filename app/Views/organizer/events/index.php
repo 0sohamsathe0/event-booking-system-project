@@ -14,7 +14,7 @@
             <?php foreach ($events as $event): ?>
                 <article class="management-card">
                     <div class="poster-thumb">
-                        <?php if ($event['poster_path']): ?><img src="<?= e(url($event['poster_path'])) ?>" alt="<?= e($event['title']) ?> poster"><?php else: ?><span>No poster</span><?php endif; ?>
+                        <?php $posterUrl = poster_url($event['poster_path']); if ($posterUrl): ?><img src="<?= e($posterUrl) ?>" alt="<?= e($event['title']) ?> poster"><?php else: ?><span>No poster</span><?php endif; ?>
                     </div>
                     <div class="management-card-body">
                         <div class="card-meta"><span><?= e($event['category_name']) ?></span><span class="status-badge status-<?= e($event['status']) ?>"><?= e(ucfirst($event['status'])) ?></span></div>
@@ -23,7 +23,7 @@
                         <p>Capacity: <?= e($event['event_capacity']) ?></p>
                         <dl class="event-booking-metrics"><div><dt>Bookings</dt><dd><?= e($event['confirmed_bookings']) ?></dd></div><div><dt>Tickets</dt><dd><?= e($event['confirmed_tickets']) ?></dd></div><div><dt>Revenue</dt><dd><?= e(money($event['confirmed_revenue'])) ?></dd></div></dl>
                         <?php if ($event['status'] === 'rejected' && $event['rejection_reason']): ?><div class="alert alert-error">Reason: <?= e($event['rejection_reason']) ?></div><?php endif; ?>
-                        <div class="hero-actions"><a class="button button-secondary button-compact" href="<?= e(url('organizer/events/' . $event['id'] . '/bookings')) ?>">Bookings</a><?php if ($event['status'] !== 'cancelled'): ?><a class="button button-secondary button-compact" href="<?= e(url('organizer/events/' . $event['id'] . '/edit')) ?>">Edit</a><a class="button button-compact" href="<?= e(url('organizer/events/' . $event['id'] . '/tickets')) ?>">Tickets</a><?php endif; ?></div>
+                        <div class="hero-actions"><a class="button button-secondary button-compact" href="<?= e(url('organizer/events/' . $event['id'] . '/bookings')) ?>">Bookings</a><?php if ($event['status'] !== 'cancelled'): ?><a class="button button-secondary button-compact" href="<?= e(url('organizer/events/' . $event['id'] . '/edit')) ?>">Edit</a><a class="button button-compact" href="<?= e(url('organizer/events/' . $event['id'] . '/tickets')) ?>">Tickets</a><?php endif; ?><a class="button button-secondary button-compact" href="<?= e(url('organizer/cancellations')) ?>">Cancellation</a></div>
                     </div>
                 </article>
             <?php endforeach; ?>

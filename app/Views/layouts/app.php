@@ -40,6 +40,18 @@ if ($isDashboard) {
     <link rel="stylesheet" href="<?= e(url('assets/css/app.css')) ?>">
 </head>
 <body class="<?= e(implode(' ', $bodyClasses)) ?>">
+    <div class="global-loader" data-global-loader hidden aria-hidden="true">
+        <div class="global-loader-panel" role="status" aria-live="polite" aria-atomic="true">
+            <span class="global-loader-mark" aria-hidden="true">E</span>
+            <span class="global-loader-content">
+                <span class="global-loader-kicker">Event Booking</span>
+                <strong class="global-loader-label" data-global-loader-label>Loading</strong>
+                <span class="global-loader-track" aria-hidden="true"><span></span></span>
+                <small>Securely processing your request</small>
+            </span>
+        </div>
+    </div>
+
     <header class="site-header">
         <div class="container navigation">
             <a class="brand" href="<?= e(url('')) ?>">
@@ -80,6 +92,8 @@ if ($isDashboard) {
                     <?php if ($role === 'admin'): ?>
                         <a class="<?= str_contains($requestPath, '/admin/dashboard') ? 'active' : '' ?>" href="<?= e(url('admin/dashboard')) ?>">Overview</a>
                         <a class="<?= str_contains($requestPath, '/admin/bookings') ? 'active' : '' ?>" href="<?= e(url('admin/bookings')) ?>">Bookings</a>
+                        <a class="<?= str_contains($requestPath, '/admin/refunds') ? 'active' : '' ?>" href="<?= e(url('admin/refunds')) ?>">Refunds</a>
+                        <a class="<?= str_contains($requestPath, '/admin/cancellations') ? 'active' : '' ?>" href="<?= e(url('admin/cancellations')) ?>">Cancellations</a>
                         <a class="<?= str_contains($requestPath, '/admin/customers') ? 'active' : '' ?>" href="<?= e(url('admin/customers')) ?>">Customers</a>
                         <a class="<?= str_contains($requestPath, '/admin/organizers') ? 'active' : '' ?>" href="<?= e(url('admin/organizers')) ?>">Organizers</a>
                         <a class="<?= str_contains($requestPath, '/admin/events') ? 'active' : '' ?>" href="<?= e(url('admin/events')) ?>">Events</a>
@@ -92,6 +106,7 @@ if ($isDashboard) {
                         <a class="<?= $isAccountArea ? 'active' : '' ?>" href="<?= e(url('account')) ?>">Overview</a>
                         <a class="<?= str_contains($requestPath, '/organizer/events') ? 'active' : '' ?>" href="<?= e(url('organizer/events')) ?>">My events</a>
                         <a class="<?= str_contains($requestPath, '/organizer/bookings') ? 'active' : '' ?>" href="<?= e(url('organizer/bookings')) ?>">Bookings</a>
+                        <a class="<?= str_contains($requestPath, '/organizer/cancellations') ? 'active' : '' ?>" href="<?= e(url('organizer/cancellations')) ?>">Cancellations</a>
                         <form class="sidebar-logout" method="post" action="<?= e(url('logout')) ?>">
                             <?= csrf_field() ?>
                             <button type="submit">Log out</button>

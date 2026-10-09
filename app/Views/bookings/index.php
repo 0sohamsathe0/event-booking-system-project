@@ -22,6 +22,7 @@
                 <option value="any" <?= $filters['status'] === 'any' ? 'selected' : '' ?>>Any status</option>
                 <option value="pending_payment" <?= $filters['status'] === 'pending_payment' ? 'selected' : '' ?>>Pending payment</option>
                 <option value="confirmed" <?= $filters['status'] === 'confirmed' ? 'selected' : '' ?>>Confirmed</option>
+                <option value="partially_cancelled" <?= $filters['status'] === 'partially_cancelled' ? 'selected' : '' ?>>Partially cancelled</option>
                 <option value="payment_failed" <?= $filters['status'] === 'payment_failed' ? 'selected' : '' ?>>Payment failed</option>
                 <option value="expired" <?= $filters['status'] === 'expired' ? 'selected' : '' ?>>Expired</option>
                 <option value="customer_cancelled" <?= $filters['status'] === 'customer_cancelled' ? 'selected' : '' ?>>Customer cancelled</option>
